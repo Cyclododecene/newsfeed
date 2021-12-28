@@ -12,12 +12,6 @@ the date range into multiple chunks
 from typing import Optional, List, Union, Tuple
 Filter = Union[List[str], str]
 def near(n: int, *args) -> str:
-    """
-    Build the filter to find articles containing words that occur within
-    `n` words of each other.
-    eg. near(5, "airline", "climate") finds articles containing both
-    "airline" and "climate" within 5 words.
-    """
     if len(args) < 2:
         raise ValueError("At least two words must be provided")
 
@@ -25,12 +19,6 @@ def near(n: int, *args) -> str:
 
 
 def repeat(n: int, keyword: str) -> str:
-    """
-    Build the filter to find articles containing `keyword` at least `n` times.
-    eg. repeat(2, "environment") finds articles containing the word "environment"
-    at least twice.
-    Only single word repetitions are allowed.
-    """
     if " " in keyword:
         raise ValueError("Only single words can be repeated")
 
@@ -38,15 +26,6 @@ def repeat(n: int, keyword: str) -> str:
 
 
 def multi_repeat(repeats: List[Tuple[int, str]], method: str) -> str:
-    """
-    Build the filter to find articles containing multiple repeated words using `repeat()`
-    eg. multi_repeat([(2, "airline"), (3, "airport")], "AND") finds articles that contain the word "airline" at least
-    twice and "airport" at least 3 times.
-    Params
-    ------
-        repeats: A list of (int, str) tuples to be passed to `repeat()`. Eg. [(2, "airline"), (3, "airport")]
-        method: How to combine the restrictions. Must be one of "AND" or "OR"
-    """
     if method not in ["AND", "OR"]:
         raise ValueError(f"method must be one of AND or OR, not {method}")
 
@@ -54,7 +33,7 @@ def multi_repeat(repeats: List[Tuple[int, str]], method: str) -> str:
     return method.join(to_repeat)
 
 
-class Filters:
+class Filter:
     def __init__(
         self, start_date: Optional[str] = None, end_date: Optional[str] = None, num_records: int = 250,
         keyword: Optional[Filter] = None, domain: Optional[Filter] = None,
@@ -68,15 +47,9 @@ class Filters:
         self._valid_themes: List[str] = []
         self.start_date = None
         self.end_date = None
-
-        # Check we have either start/end date or timespan, but not both
+        # check date
         if not start_date and not end_date:
             raise ValueError("Must provide either start_date and end_date, or timespan")
-
-        if start_date and end_date:
-            raise ValueError(
-                "Can only provide either start_date and end_date, or timespan"
-            )
 
         if keyword:
             self.query_params.append(self._keyword_to_string(keyword))
@@ -100,12 +73,16 @@ class Filters:
             self.query_params.append(repeat)
 
         if start_date:
-            self.query_params.append(
-                f'&startdatetime={start_date.replace("-", "")}000000'
-            )
-            self.query_params.append(f'&enddatetime={end_date.replace("-", "")}000000')
+            if len(start_date) > 10 and len(end_date) > 10:
+                self.query_params.append(f"&startdatetime={start_date.replace('-', '')}")
+                self.query_params.append(f"&enddatetime={end_date.replace('-', '')}")
+            else:
+                self.query_params.append(f'&startdatetime={start_date.replace("-", "")}000000')
+                self.query_params.append(f'&enddatetime={end_date.replace("-", "")}000000')
+
             self.start_date = start_date
             self.end_date = end_date
+
 
         if num_records > 250:
             raise ValueError(f"num_records must 250 or less, not {num_records}")
@@ -165,4 +142,11 @@ class Filters:
                 )
                 + ") "
             )
-    
+
+"""
+f = Filter(
+    keyword = "climate change",
+    start_date = "2021-05-10-12-01-00",
+    end_date = "2021-05-12-12-02-00"
+)
+"""
