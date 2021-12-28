@@ -3,10 +3,11 @@ author: Terence Junjie LIU
 start_date: Mon 27 Dec, 2021
 
 The original code is from gdelt-doc-api:
-"https://github.com/alex9smith/gdelt-doc-api/blob/main/gdeltdoc/api_client.py"
-by default, the system only provide at max 250 results
-thus, we are trying to remove the boundary by spliting
-the date range into multiple chunks
+"https://github.com/alex9smith/gdelt-doc-api/blob/main/gdeltdoc/filters.py"
+difference between this and the original:
+1. remove the parameter: timespan, use start-date and end-date only
+2. start-date and end-date, we also consider the HH:MM:SS for more precise querying
+3. 
 """
 
 from typing import Optional, List, Union, Tuple
@@ -37,9 +38,8 @@ class Filter:
     def __init__(
         self, start_date: Optional[str] = None, end_date: Optional[str] = None, num_records: int = 250,
         keyword: Optional[Filter] = None, domain: Optional[Filter] = None,
-        domain_exact: Optional[Filter] = None, near: Optional[str] = None,
-        repeat: Optional[str] = None, country: Optional[Filter] = None,
-        theme: Optional[Filter] = None,
+        domain_exact: Optional[Filter] = None, near: Optional[str] = None, repeat: Optional[str] = None, 
+        country: Optional[Filter] = None, theme: Optional[Filter] = None,
     ) -> None:
         
         self.query_params: List[str] = []
@@ -47,9 +47,12 @@ class Filter:
         self._valid_themes: List[str] = []
         self.start_date = None
         self.end_date = None
+        
         # check date
         if not start_date and not end_date:
-            raise ValueError("Must provide either start_date and end_date, or timespan")
+            raise ValueError("Must provide either start_date and end_date")
+        if len(start_date) < 10 and len(end_date)< 10:
+            raise ValueError("Format of time: 'YYYY-MM-DD' or 'YYYY-MM-DD-HH-MM-SS'")
 
         if keyword:
             self.query_params.append(self._keyword_to_string(keyword))
@@ -95,19 +98,6 @@ class Filter:
 
     @staticmethod
     def _filter_to_string(name: str, f: Filter) -> str:
-        """
-        Convert a Filter into the string representation needed for the API.
-        Params
-        ------
-        name
-            The filter name as required by the API
-        f
-            The Filter to convert
-        Returns
-        -------
-        str
-            The converted filter. Eg. "domain:cnn.com"
-        """
         if type(f) == str:
             return f"{name}:{f} "
 
@@ -117,36 +107,8 @@ class Filter:
 
     @staticmethod
     def _keyword_to_string(keywords: Filter) -> str:
-        """
-        Convert a Filter for keywords into the string for the API.
-        The keyword argument is different to all the others in that there's
-        no parameter name needed and if a key phrase is passed it
-        must be wrapped in quotes.
-        Params
-        ------
-        keyword
-            The keyword Filter
-        Returns
-        -------
-        str
-            The converted filter eg. "(airline OR shipping)"
-        """
         if type(keywords) == str:
             return f'"{keywords}" '
 
         else:
-            return (
-                "("
-                + " OR ".join(
-                    [f'"{word}"' if " " in word else word for word in keywords]
-                )
-                + ") "
-            )
-
-"""
-f = Filter(
-    keyword = "climate change",
-    start_date = "2021-05-10-12-01-00",
-    end_date = "2021-05-12-12-02-00"
-)
-"""
+            return ("(" + " OR ".join([f'"{word}"' if " " in word else word for word in keywords])+ ") ")

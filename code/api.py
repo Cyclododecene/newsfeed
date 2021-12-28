@@ -1,5 +1,15 @@
+"""
+author: Terence Junjie LIU
+start_date: Mon 27 Dec, 2021
+
+The original code is from gdelt-doc-api:
+"https://github.com/alex9smith/gdelt-doc-api/blob/main/gdeltdoc/api_client.py"
+by default, the system only provide at max 250 results
+thus, we are trying to remove the boundary by spliting
+the date range into multiple chunks
+"""
+
 from datetime import datetime, timedelta
-from dateutil import rrule
 import pandas as pd
 import requests
 import json
@@ -26,11 +36,11 @@ def load_json(json_message, max_recursion_depth: int = 100, recursion_depth: int
                          recursion_depth=recursion_depth+1)
     return result
 
-def article_search(filter = None, max_recursion_depth: int = 100):
-    if filter == None:
-        return ValueError("Filter must be provided")
+def query_search(query_string = None, max_recursion_depth: int = 100):
+    if query_string == None:
+        return ValueError("Query string must be provided")
     else:
-        query_string = filter.query_string
+        query_string = query_string
         response = requests.get(f"https://api.gdeltproject.org/api/v2/doc/doc?query={query_string}&mode=artlist&format=json")
         if response.text == "Timespan is too short.\n":
             return ValueError("Timespan is too short.")
@@ -38,23 +48,18 @@ def article_search(filter = None, max_recursion_depth: int = 100):
             return pd.DataFrame(load_json(response.text, max_recursion_depth = max_recursion_depth)["articles"])
 
 
-def article_search_large_time_range(filter = None, max_recursion_depth: int = 100):
+def article_search(query_filter = None, max_recursion_depth: int = 100):
     articles_list = []
-    if filter == None:
+    if query_filter == None:
         return ValueError("Filter must be provided")
     else:
-        new_end_date = datetime.strptime(filter.start_date, "%Y-%m-%d-%H-%M-%S") + timedelta(hours=12)
-        tmp_f = filter
-        while new_end_date <= datetime.strptime(filter.end_date, "%Y-%m-%d-%H-%M-%S"):
-            tmp_f.query_string = tmp_f.query_string.replace(tmp_f.end_date.replace("-", ""), datetime.strftime(new_end_date, "%Y-%m-%d-%H-%M-%S").replace("-", "")) #TODO fix this
-            tmp_articles = article_search(tmp_f, max_recursion_depth=100)
+        new_end_date = datetime.strptime(query_filter.start_date, "%Y-%m-%d-%H-%M-%S") + timedelta(hours=12)
+        tmp_query_string = query_filter.query_string
+        while new_end_date <= datetime.strptime(query_filter.end_date, "%Y-%m-%d-%H-%M-%S"):
+            tmp_query_string = tmp_query_string.replace(query_filter.end_date.replace("-", ""), datetime.strftime(new_end_date, "%Y-%m-%d-%H-%M-%S").replace("-", ""))
+            tmp_articles = query_search(tmp_query_string, max_recursion_depth=100)
             articles_list.append(tmp_articles)
-            tmp_f.query_string = tmp_f.query_string.replace(tmp_f.start_date.replace("-", ""), datetime.strftime(new_end_date, "%Y-%m-%d-%H-%M-%S").replace("-", ""))
+            tmp_query_string = tmp_query_string.replace(query_filter.start_date.replace("-", ""), datetime.strftime(new_end_date, "%Y-%m-%d-%H-%M-%S").replace("-", ""))
             new_end_date = new_end_date + timedelta(hours=12)
-                return pd.concat(articles_list)
-
-f = Filter(
-    keyword = "climate change",
-    start_date = "2021-05-10-12-01-00",
-    end_date = "2021-05-12-12-02-00"
-)
+            
+        return pd.concat(articles_list)
