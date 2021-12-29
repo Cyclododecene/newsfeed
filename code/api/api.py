@@ -70,12 +70,12 @@ def query_search(query_string = None, max_recursion_depth: int = 100):
             return pd.DataFrame(load_json(response.text, max_recursion_depth = max_recursion_depth)["articles"])
 
 
-def article_search(query_filter = None, max_recursion_depth:int = 100):
+def article_search(query_filter = None, max_recursion_depth:int = 100, time_range:int = 12):
     articles_list = []
     if query_filter == None:
         return ValueError("Filter must be provided")
     else:
-        new_end_date = datetime.strptime(query_filter.start_date, "%Y-%m-%d-%H-%M-%S") + timedelta(hours = 12) # tmp_end_date
+        new_end_date = datetime.strptime(query_filter.start_date, "%Y-%m-%d-%H-%M-%S") + timedelta(hours = time_range) # tmp_end_date
         tmp_query_string = query_filter.query_string
         # tmp_end_date <= real end date
         while new_end_date <= datetime.strptime(query_filter.end_date, "%Y-%m-%d-%H-%M-%S"): 
@@ -86,6 +86,19 @@ def article_search(query_filter = None, max_recursion_depth:int = 100):
             articles_list.append(tmp_articles)
             # subsitute the query parameters (startdatetime)
             tmp_start_date_string = new_start_date = "&startdatetime=" + datetime.strftime(new_end_date, "%Y-%m-%d-%H-%M-%S").replace("-", "") + "&enddatetime="
-            new_end_date = new_end_date + timedelta(hours = 12)
+            new_end_date = new_end_date + timedelta(hours = time_range)
             
         return pd.concat(articles_list)
+
+# example
+"""
+from filters import * 
+from api import * 
+
+f = Filter(
+    start_date = "2021-05-09-00-00-00",
+    end_date = "2021-05-12-00-00-00",
+    country = ["US", "UK"]
+)
+articles = article_search(query_filter = f, max_recursion_depth = 100, time_range = 6)
+"""
