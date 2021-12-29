@@ -21,7 +21,8 @@ f = Filter(
     end_date = "2021-05-12-00-00-00",
     country = ["China", "US"]
 )
-articles = article_search(query_filter = f, max_recursion_depth = 100, time_range = "6")
+
+articles = article_search(query_filter = f, max_recursion_depth = 100, time_range = 60)
 ```
 
 most of the parameters are the same with [gdelt-doc-api](https://github.com/alex9smith/gdelt-doc-api/), however, to specify the precise date range, we remove the `timespan` and use `start_date` and `time_range` for iteratively collecting articles.

@@ -44,51 +44,74 @@ def load_json(json_message, max_recursion_depth: int = 100, recursion_depth: int
     try:
         result = json.loads(json_message)
     except Exception as e:
+        
         if recursion_depth >= max_recursion_depth:
             raise ValueError("Max Recursion depth is reached. JSON can´t be parsed!")
         # Find the offending character index:
         idx_to_replace = int(e.pos)
-        # Remove the offending character: 
+        
+        # Remove the offending character:
         if isinstance(json_message, bytes):
             json_message.decode("utf-8")
         json_message = list(json_message)
         json_message[idx_to_replace] = ' '
         new_message = ''.join(str(m) for m in json_message)
-        return load_json(json_message=new_message, max_recursion_depth=max_recursion_depth,
-                         recursion_depth=recursion_depth+1)
+        return load_json(json_message=new_message, max_recursion_depth=max_recursion_depth, recursion_depth=recursion_depth + 1)
     return result
 
-def query_search(query_string = None, max_recursion_depth: int = 100):
+def query_search(query_string = None, max_recursion_depth: int = 100, mode = None):
+
     if query_string == None:
         return ValueError("Query string must be provided")
+    elif mode == None:
+        return ValueError("Query mode must be provided")
     else:
         query_string = query_string
-        response = requests.get(f"https://api.gdeltproject.org/api/v2/doc/doc?query={query_string}&mode=artlist&format=json")
+        response = requests.get(f"https://api.gdeltproject.org/api/v2/doc/doc?query={query_string}&mode={mode}&format=json")
+
         if response.text == "Timespan is too short.\n":
             return ValueError("Timespan is too short.")
+
         else:
-            return pd.DataFrame(load_json(response.text, max_recursion_depth = max_recursion_depth)["articles"])
+            if mode == "artlist":
+                return pd.DataFrame(load_json(response.text, max_recursion_depth = max_recursion_depth)["articles"])
+            elif mode == "timelinevol" or "timelinevolraw" or "timelinetone" or "timelinetone" or "timelinelang" or "timelinesourcecountry":
+                return pd.DataFrame(load_json(response.text)["timeline"][0]["data"])
 
-
-def article_search(query_filter = None, max_recursion_depth:int = 100, time_range:int = 12):
+def article_search(query_filter = None, max_recursion_depth:int = 100, time_range:int = 60):
     articles_list = []
+
     if query_filter == None:
         return ValueError("Filter must be provided")
+
     else:
-        new_end_date = datetime.strptime(query_filter.start_date, "%Y-%m-%d-%H-%M-%S") + timedelta(hours = time_range) # tmp_end_date
+        new_end_date = datetime.strptime(query_filter.start_date, "%Y-%m-%d-%H-%M-%S") + timedelta(minutes = time_range) # tmp_end_date
         tmp_query_string = query_filter.query_string
+        
         # tmp_end_date <= real end date
         while new_end_date <= datetime.strptime(query_filter.end_date, "%Y-%m-%d-%H-%M-%S"): 
             # subsitute the query parameters (enddatetime)
             tmp_end_date_string = "&enddatetime=" + datetime.strftime(new_end_date, "%Y-%m-%d-%H-%M-%S").replace("-", "") + "&maxrecords"
             tmp_query_string = text_regex(str_1="&enddatetime=", str_2 = "&maxrecords", newstring = tmp_end_date_string, text = tmp_query_string)
-            tmp_articles = query_search(tmp_query_string, max_recursion_depth = max_recursion_depth)
+            print(tmp_query_string)
+            tmp_articles = query_search(query_string = tmp_query_string, max_recursion_depth = max_recursion_depth, mode = "artlist")
             articles_list.append(tmp_articles)
             # subsitute the query parameters (startdatetime)
-            tmp_start_date_string = new_start_date = "&startdatetime=" + datetime.strftime(new_end_date, "%Y-%m-%d-%H-%M-%S").replace("-", "") + "&enddatetime="
-            new_end_date = new_end_date + timedelta(hours = time_range)
+            tmp_start_date_string = "&startdatetime=" + datetime.strftime(new_end_date, "%Y-%m-%d-%H-%M-%S").replace("-", "") + "&enddatetime="
+            tmp_query_string = text_regex(str_1="&startdatetime", str_2 = "&enddatetime", newstring = tmp_start_date_string, text = tmp_query_string)
+            new_end_date = new_end_date + timedelta(minutes = time_range)
             
         return pd.concat(articles_list)
+
+def timeline_search(query_filter = None, max_recursion_depth:int = 100, query_mode: str = "timelinevol"):
+
+    if query_filter == None:
+        return ValueError("Filter must be provided")
+
+    tmp_query_string = query_filter.query_string
+    timeline = query_search(query_string = tmp_query_string, max_recursion_depth = max_recursion_depth, mode = query_mode)
+    timeline["date"] = pd.to_datetime(timeline["date"], format="%Y%m%dT%H%M%SZ")
+    return timeline
 
 # example
 """
@@ -100,5 +123,7 @@ f = Filter(
     end_date = "2021-05-12-00-00-00",
     country = ["US", "UK"]
 )
-articles = article_search(query_filter = f, max_recursion_depth = 100, time_range = 6)
+
+articles = article_search(query_filter = f, max_recursion_depth = 100, time_range = 60)
+timelines = timeline_search(query_filter = f, max_recursion_depth = 100, query_mode = "timelinetone")
 """
