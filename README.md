@@ -42,4 +42,8 @@ f = Filter(
 timelineraw = timelines_search(query_filter = f, max_recursion_depth = 100, query_mode = "timelinevolraw")
 ```
 
+query_mode:
+* artlist: `article_search`
+* timeline: `timelinevol`, `timelinevolraw`, `timelinetone`, `timelinelang`, `timelinesourcecountry`
+
 most of the parameters are the same with [gdelt-doc-api](https://github.com/alex9smith/gdelt-doc-api/), however, to specify the precise date range, we remove the `timespan` and use `start_date` and `time_range` for iteratively collecting articles.
