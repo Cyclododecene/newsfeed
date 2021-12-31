@@ -31,10 +31,6 @@ import requests
 import json
 import re
 
-def get_delta(date_1, date_2):
-    delta = date_2 - date_1
-    return delta
-
 def text_regex(str_1, str_2, newstring, text):
     reg = "%s(.*?)%s" % (str_1,str_2)
     r = re.compile(reg,re.DOTALL)
@@ -101,7 +97,7 @@ def article_search(query_filter = None, max_recursion_depth:int = 100, time_rang
             tmp_query_string = text_regex(str_1="&startdatetime", str_2 = "&enddatetime", newstring = tmp_start_date_string, text = tmp_query_string)
             new_end_date = new_end_date + timedelta(minutes = time_range)
             
-        return pd.concat(articles_list)
+        return pd.concat(articles_list).drop_duplicates().reset_index(drop = True)
 
 def timeline_search(query_filter = None, max_recursion_depth:int = 100, query_mode: str = "timelinevol"):
 
@@ -112,18 +108,3 @@ def timeline_search(query_filter = None, max_recursion_depth:int = 100, query_mo
     timeline = query_search(query_string = tmp_query_string, max_recursion_depth = max_recursion_depth, mode = query_mode)
     timeline["date"] = pd.to_datetime(timeline["date"], format="%Y%m%dT%H%M%SZ")
     return timeline
-
-# example
-"""
-from filters import * 
-from api import * 
-
-f = Filter(
-    start_date = "2021-05-09-00-00-00",
-    end_date = "2021-05-12-00-00-00",
-    country = ["US", "UK"]
-)
-
-articles = article_search(query_filter = f, max_recursion_depth = 100, time_range = 60)
-timelines = timeline_search(query_filter = f, max_recursion_depth = 100, query_mode = "timelinetone")
-"""

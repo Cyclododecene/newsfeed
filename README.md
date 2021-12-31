@@ -23,7 +23,9 @@ f = Filter(
     end_date = "2021-05-12-00-00-00",
     country = ["China", "US"]
 )
-articles = article_search(query_filter = f, max_recursion_depth = 100, time_range = 60)
+
+articles_30 = article_search(query_filter = f, max_recursion_depth = 100, time_range = 30)
+articles_60 = article_search(query_filter = f, max_recursion_depth = 100, time_range = 60)
 ```
 
 ### Timelinear Search
