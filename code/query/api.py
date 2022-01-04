@@ -55,7 +55,7 @@ def load_json(json_message, max_recursion_depth: int = 100, recursion_depth: int
         return load_json(json_message=new_message, max_recursion_depth=max_recursion_depth, recursion_depth=recursion_depth + 1)
     return result
 
-def query_search(query_string = None, max_recursion_depth: int = 100, mode = None):
+def doc_query_search(query_string = None, max_recursion_depth: int = 100, mode = None):
 
     if query_string == None:
         return ValueError("Query string must be provided")
@@ -90,7 +90,7 @@ def article_search(query_filter = None, max_recursion_depth:int = 100, time_rang
             tmp_end_date_string = "&enddatetime=" + datetime.strftime(new_end_date, "%Y-%m-%d-%H-%M-%S").replace("-", "") + "&maxrecords"
             tmp_query_string = text_regex(str_1="&enddatetime=", str_2 = "&maxrecords", newstring = tmp_end_date_string, text = tmp_query_string)
             print(tmp_query_string)
-            tmp_articles = query_search(query_string = tmp_query_string, max_recursion_depth = max_recursion_depth, mode = "artlist")
+            tmp_articles = doc_query_search(query_string = tmp_query_string, max_recursion_depth = max_recursion_depth, mode = "artlist")
             articles_list.append(tmp_articles)
             # subsitute the query parameters (startdatetime)
             tmp_start_date_string = "&startdatetime=" + datetime.strftime(new_end_date, "%Y-%m-%d-%H-%M-%S").replace("-", "") + "&enddatetime="
@@ -105,6 +105,15 @@ def timeline_search(query_filter = None, max_recursion_depth:int = 100, query_mo
         return ValueError("Filter must be provided")
 
     tmp_query_string = query_filter.query_string
-    timeline = query_search(query_string = tmp_query_string, max_recursion_depth = max_recursion_depth, mode = query_mode)
+    timeline = doc_query_search(query_string = tmp_query_string, max_recursion_depth = max_recursion_depth, mode = query_mode)
     timeline["date"] = pd.to_datetime(timeline["date"], format="%Y%m%dT%H%M%SZ")
     return timeline
+
+
+def geo_search(query_filter = None, max_recursion_depth:int = 100, query_mode: str = "PointData"):
+    if query_filter == None:
+        return ValueError("Filter must be provided")
+    
+
+    tmp_query_string = query_filter.query_string
+    result = query_search(query_string)

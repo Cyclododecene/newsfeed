@@ -18,7 +18,7 @@ from code.api.filters import *
 from code.api.api import * 
 
 f = Filter(
-    keyword = "climate change",
+    keyword = ["Exchange Rate", "World"],
     start_date = "2021-05-09-00-00-00",
     end_date = "2021-05-12-00-00-00",
     country = ["China", "US"]
@@ -28,20 +28,20 @@ articles_30 = article_search(query_filter = f, max_recursion_depth = 100, time_r
 articles_60 = article_search(query_filter = f, max_recursion_depth = 100, time_range = 60)
 ```
 
-### Timelinear Search
+### Timeline Search
 
 ```python
 from code.api.filters import *
 from code.api.api import * 
 
-f = Filter(
-    keyword = "climate change",
+f = Doc_Filter(
+    keyword = ["Exchange Rate", "World"],
     start_date = "2021-05-09-00-00-00",
     end_date = "2021-05-12-00-00-00",
     country = ["China", "US"]
 )
 
-timelineraw = timelines_search(query_filter = f, max_recursion_depth = 100, query_mode = "timelinevolraw")
+timelineraw = timeline_search(query_filter = f, max_recursion_depth = 100, query_mode = "timelinevolraw")
 ```
 
 query_mode:
@@ -49,3 +49,6 @@ query_mode:
 * timeline: `timelinevol`, `timelinevolraw`, `timelinetone`, `timelinelang`, `timelinesourcecountry`
 
 most of the parameters are the same with [gdelt-doc-api](https://github.com/alex9smith/gdelt-doc-api/), however, to specify the precise date range, we remove the `timespan` and use `start_date` and `time_range` for iteratively collecting articles.
+
+### GEO Search
+
