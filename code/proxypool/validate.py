@@ -1,8 +1,6 @@
-import os 
+import re
 import json
 import time
-from tkinter.messagebox import NO
-from weakref import proxy
 import requests
 from fake_useragent import UserAgent
 
@@ -24,7 +22,7 @@ class validater(object):
         """
         self.http_validate_url = "http://httpbin.org/get"
         self.https_validate_url = "https://httpbin.org/ip"
-        self.validate_url = "https://api.myip.com/"
+        self.validate_url = "https://api.hostip.info/get_json.php?"
 
         self.proxies = proxies
         self.type = proxy_type
@@ -118,7 +116,31 @@ class validater(object):
             except Exception as e:
                 status = False
                 return status, response_time, anonymity
-                    
+
+    #TODO: validate ip location
+    def _validate_ip_location(self, proxies:dict):
+        proxy_pattern = re.compile("\d+\.\d+\.\d+\.\d+")
+        proxy_ip = proxy_pattern.findall(proxies["https"])[0]
+        url = self.validate_url + "ip={}".format(proxy_ip)
+        urlcontent = requests.get(url, headers = generate_header(), timeout = 10).json()
+        country = urlcontent["country_name"]
+        short_code = urlcontent["country_code"]
+        return country, short_code
+    
+    def _validate_google(self, proxies:dict):
+        google_passed = False
+        try:
+            urlcontent = requests.get("https://google.com", proxies = proxies, timeout = 10)
+            if urlcontent.ok:
+                google_passed = True
+                return google_passed
+            else:
+                google_passed = False
+                return google_passed
+                
+        except Exception as e:
+            return google_passed
+
     def validate(self):
         proxies = self.proxies
         proxy_type = self.type
@@ -149,8 +171,12 @@ class validater(object):
                 response_time = -1
                 anonymity = -1
             
+            country, short_code = self._validate_ip_location(proxies = proxies_dict)
+            google_passed = self._validate_google(proxies = proxies_dict)
+
             tested_proxy = {"origin":self.proxies, "type":proxy_type, "status":status, 
-                            "response_time":response_time, "anonymity":anonymity}
+                            "response_time":response_time, "anonymity":anonymity, 
+                            "country":country, "short_code":short_code, "google_passed":google_passed}
             return tested_proxy
         
         else:
@@ -168,15 +194,20 @@ class validater(object):
                 status = https_status
                 response_time = -1
                 anonymity = -1
-            
+
+            country, short_code = self._validate_ip_location(proxies = proxies_dict)
+            google_passed = self._validate_google(proxies = proxies_dict)
+
             tested_proxy = {"origin":self.proxies, "type":proxy_type, "status":status, 
-                            "response_time":response_time, "anonymity":anonymity}
+                            "response_time":response_time, "anonymity":anonymity, 
+                            "country":country, "short_code":short_code, "google_passed":google_passed}
             return tested_proxy
 
-
+    # TODO: validate ip location
+    # TODO: validate google pass or not
 
 if __name__ == "__main__":
-    http_proxy = "103.149.162.194:80"
+    http_proxy = "103.149.162.194:80" # 68.188.59.198:80
     test = validater(proxies = http_proxy, proxy_type="https")
     test.validate()
     socks5_proxy = "18.162.79.205:10001"
