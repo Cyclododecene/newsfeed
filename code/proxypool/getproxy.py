@@ -9,20 +9,21 @@ proxy_source = {
     "geonode":"https://proxylist.geonode.com/api/proxy-list?",
     "ip3366":"http://www.ip3366.net/free/?",
     "jiangxianli":"https://ip.jiangxianli.com/api/proxy_ips?",
-    #"nimadaili":"https://"
+    "nimadaili":"http://nimadaili.com/",
+    "daili66":"http://www.66ip.cn/"
 }
 
-def generate_header():
-    ua = UserAgent()
-    header = {"User-Agent": str(ua.random)}
-    return header
-
-<<<<<<< HEAD
 anonymity = {
     4:"elite",
     2:"anonymous",
     1:"transparent"
 }
+
+@staticmethod
+def generate_header():
+    ua = UserAgent()
+    header = {"User-Agent": str(ua.random)}
+    return header
 
 class proxies(object):
     def __init__(self, source_name:str="proxydb", country:str=None, proxy_type:str=None, anonymityLevel:str=None,
@@ -37,7 +38,7 @@ class proxies(object):
             self.proxy_type = proxy_type
             self.country = country
             self.anonymity = anonymityLevel
-    
+
     def collect(self):
         if self.source_name == "proxydb":
             if self.anonymity == "transparent":
@@ -49,8 +50,8 @@ class proxies(object):
 
             url = proxy_source["proxydb"] + "&protocol={}&country={}&anonlvl={}".format(self.proxy_type, self.country, self.anonymity)
             urlcontent = requests.get(url, headers = generate_header())
-            proxy_pattern = re.complie("\d+\.\d+\.\d+\.\d+:\d+")
-            proxies_list = re.findall(proxy_pattern, urlcontent.text)
+            proxy_pattern = re.compile("\d+\.\d+\.\d+\.\d+:\d+")
+            proxies_list = proxy_pattern.findall(urlcontent.text)
             return proxies_list
         
         if self.source_name == "ip3366":
@@ -68,8 +69,6 @@ class proxies(object):
             return proxies_list
 
         if self.source_name == "geonode":
-            # https://proxylist.geonode.com/api/proxy-list?limit=50&page=1&sort_by=lastChecked&sort_type=desc&filterLastChecked=60&filterUpTime=100&protocols=https
-            # https://proxylist.geonode.com/api/proxy-list?limit=200&page=1&sort_by=lastChecked&sort_type=desc
             url = proxy_source["geonode"] + "limit=200&page=1&sort_by=lastChecked&sort_type=desc&filterLastChecked=60&&country={}&protocols={}&anonymityLevel={}".format(self.country, self.proxy_type, self.anonymity)
             urlcontent = requests.get(url, headers = generate_header())
             proxies_list = urlcontent.json() #TODO: formatting
@@ -80,24 +79,75 @@ class proxies(object):
                 url = proxy_source["jiangxianli"] + "page=1&orderby&order_by=created_at&order_rule=DESC"
                 urlcontent = requests.get(url, headers = generate_header())
                 proxies_list = urlcontent.json() #TODO: formatting
-        # TODO: need add  https://github.com/Lucareful/IPProxyPool
-        if self.source_name == "nimadaili":
-            for i in range(1, 10):
-                url = proxy_source["nimadali"] + ""
 
+        if self.source_name == "nimadaili":
+            if self.proxy_type == "https":
+                proxies_list = []
+                for i in range(1, 20):
+                    url = proxy_source["nimadali"] + "https/" + "{}/".format(i)
+                    urlcontent = requests.get(url, headers = generate_header())
+                    proxy_pattern = re.compile("\d+\.\d+\.\d+\.\d+:\d+")
+                    proxies_list.append(proxy_pattern.findall(urlcontent.text))
+                return proxies_list
+            elif self.proxy_type == "http":
+                proxies_list = []
+                for i in range(1, 5):
+                    url = proxy_source["nimadali"] + "https/" + "{}/".format(i)
+                    urlcontent = requests.get(url, headers = generate_header())
+                    proxy_pattern = re.compile("\d+\.\d+\.\d+\.\d+:\d+")
+                    proxies_list.append(proxy_pattern.findall(urlcontent.text))
+                return proxies_list
         
+        if self.source_name == "daili66":
+            if self.country != "HK" or self.country != "TW" or self.country != "MU":
+                proxies_list = []
+                for i in range(1, 5):
+                    url = proxy_source["daili66"] + "{}.html".format(i)
+                    urlcontent = requests.get(url, headers = generate_header())
+                    proxies_table = BeautifulSoup(urlcontent.text, "lxml")
+                    trs = proxies_table.find_all("tr")
+                    for i in range(2, len(trs)):
+                        tr = trs[i]
+                        tds = tr.find_all("td")
+                        ip = tds[0].text
+                        port = tds[1].text
+                        proxies_list.append("%s:%s" % (ip, port))
+
+                return proxies_list
+
+            elif self.country == "HK":
+                proxies_list = []
+                url = proxy_source["daili66"] + "areaindex_33/1.html"
+                urlcontent = requests.get(url, headers = generate_header())
+                proxies_table = BeautifulSoup(urlcontent.text, "lxml")
+                trs = proxies_table.find_all("tr")
+                for i in range(2, len(trs)):
+                    tr = trs[i]
+                    tds = tr.find_all("td")
+                    ip = tds[0].text
+                    port = tds[1].text
+                    proxies_list.append("%s:%s" % (ip, port))
+
+                return proxies_list    
+
+            elif self.country == "TW":
+                proxies_list = []
+                url = proxy_source["daili66"] + "areaindex_27/1.html"
+                urlcontent = requests.get(url, headers = generate_header())
+                proxies_table = BeautifulSoup(urlcontent.text, "lxml")
+                trs = proxies_table.find_all("tr")
+                for i in range(2, len(trs)):
+                    tr = trs[i]
+                    tds = tr.find_all("td")
+                    ip = tds[0].text
+                    port = tds[1].text
+                    proxies_list.append("%s:%s" % (ip, port))
+
+                return proxies_list          
 
 
 
 
 """
 #example
-from getproxy import * 
-
-proxies_CN = proxies(source_name="proxydb", country="CN", proxy_type="socks5")
-proxies_CN_list = proxies_CN.collect()
-proxies_HK = proxies(source_name="proxydb", country="HK", proxy_type="socks5")
-proxies_HK_list = proxies_HK.collect()
-proxies_US = proxies(source_name="proxydb", country="US", proxy_type="socks5")
-proxies_US_list = proxies_US.collect()
 """
