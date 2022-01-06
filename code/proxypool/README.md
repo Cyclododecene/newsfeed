@@ -1,6 +1,6 @@
 # Proxy Pool
 
-## Some Free Proxy Source
+## Some Free Proxy Sources
 
 ```python
 proxy_source = {
@@ -12,3 +12,28 @@ proxy_source = {
     "daili66":"http://www.66ip.cn/"
 }
 ```
+
+## Components
+
+### proxy crawler
+
+```python
+from getproxy import * 
+proxies_list = proxies(source_name = "proxydb", country="US", proxy_type="http", anonymity="elite").collect()
+```
+
+### proxy validation
+
+```python
+for i in range(0 len(proxies_list)):
+    test = validater(proxies = proxies_list[i], proxy_type="https")
+    test.validate()
+```
+
+### storage
+
+
+## TODO
+
+- [ ] use `selenium` for automation
+- [ ] use `redis` or other NoSQL database to replace `sqlite`
