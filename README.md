@@ -4,8 +4,8 @@ GNAF: GDELT News Aggregation and Feed
 
 ## News Query
 
-Check [query](query/README.md)
+Check [query](https://github.com/Cyclododecene/GNAF/query/README.md)
 
 ## Proxy Pool
 
-Check [query](proxypool/README.md)
+Check [proxypool](https://github.com/Cyclododecene/GNAF/blob/main/code/proxypool/README.md)
