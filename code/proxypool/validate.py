@@ -145,7 +145,7 @@ class validater(object):
         proxies = self.proxies
         proxy_type = self.type
         if proxy_type != "socks5":
-            proxies_dict = {"http:":"http://{}".format(proxies), "https:":"https://{}".format(proxies)}
+            proxies_dict = {"http":"http://{}".format(proxies), "https":"https://{}".format(proxies)}
 
             http_status, http_response_time, http_anonymity = self._validate_proxy_status(proxies = proxies_dict, proxy_type = "http")
             https_status, https_response_time, https_anonymity = self._validate_proxy_status(proxies = proxies_dict, proxy_type = "https")
