@@ -180,7 +180,7 @@ class validater(object):
             return tested_proxy
         
         else:
-            proxies_dict = {"http:":"socks5://{}".format(proxies), "https:":"socks5://{}".format(proxies)}
+            proxies_dict = {"http":"socks5://{}".format(proxies), "https":"socks5://{}".format(proxies)}
 
             http_status, http_response_time, http_anonymity = self._validate_proxy_status(proxies = proxies_dict, proxy_type = "http")
             https_status, https_response_time, https_anonymity = self._validate_proxy_status(proxies = proxies_dict, proxy_type = "https")
