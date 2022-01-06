@@ -32,6 +32,17 @@ for i in range(0 len(proxies_list)):
 
 ### storage
 
+Store proxy and its status into a database, for now, we are using `sqlite`
+
+```python
+import sqlite3
+
+con = sqlite3.connect("data/proxy.db")
+cur = con.cursor()
+create_db(cursor = cur)
+pass_data(cursor = cur, data = proxies)
+```
+
 
 ## TODO
 

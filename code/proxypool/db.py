@@ -31,7 +31,7 @@ def create_db(cursor=cur):
                                         ShortCode TEXT, \
                                         Google INT);")
 
-def pass_data(cursor = cur, data:dict=None):
+def pass_data(cursor = cur, data:dict = None):
     """
     pass data to database
     """
