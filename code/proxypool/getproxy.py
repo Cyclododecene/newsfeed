@@ -1,7 +1,6 @@
 import re
 import base64
 import requests
-from tqdm import tqdm
 from numpy import source
 from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
@@ -69,13 +68,13 @@ class proxies(object):
             url = proxy_source["geonode"] + "limit=200&page=1&sort_by=lastChecked&sort_type=desc&filterLastChecked=60&&country={}&protocols={}&anonymityLevel={}".format(self.country, self.proxy_type, self.anonymity)
             urlcontent = requests.get(url, headers = generate_header())
             tmp_proxies_list = urlcontent.json()
-            for i in tqdm(range(0, len(tmp_proxies_list["data"]))):
+            for i in range(0, len(tmp_proxies_list["data"])):
                 proxies_list.append(tmp_proxies_list["data"][i]["ip"] + ":" + tmp_proxies_list["data"][i]["port"])
             return proxies_list
         
         if self.source_name == "jiangxianli":
             proxies_list = []
-            for i in tqdm(range(1, 3)):
+            for i in range(1, 3):
                 url = proxy_source["jiangxianli"] + "page=1&orderby&order_by=created_at&order_rule=DESC"
                 urlcontent = requests.get(url, headers = generate_header())
                 for i in range(0, len(urlcontent.json()["data"]["data"])):
@@ -85,7 +84,7 @@ class proxies(object):
         if self.source_name == "nimadaili":
             if self.proxy_type == "https":
                 tmp_proxies_list = []
-                for i in tqdm(range(1, 5)):
+                for i in range(1, 5):
                     url = proxy_source["nimadaili"] + "https/" + "{}/".format(i)
                     urlcontent = requests.get(url, headers = generate_header())
                     proxy_pattern = re.compile("\d+\.\d+\.\d+\.\d+:\d+")
@@ -94,7 +93,7 @@ class proxies(object):
                 return proxies_list
             elif self.proxy_type == "http":
                 tmp_proxies_list = []
-                for i in tqdm(range(1, 5)):
+                for i in range(1, 5):
                     url = proxy_source["nimadaili"] + "https/" + "{}/".format(i)
                     urlcontent = requests.get(url, headers = generate_header())
                     proxy_pattern = re.compile("\d+\.\d+\.\d+\.\d+:\d+")
@@ -105,7 +104,7 @@ class proxies(object):
         if self.source_name == "daili66":
             if self.country != "HK" and self.country != "TW" and self.country != "MU":
                 proxies_list = []
-                for i in tqdm(range(1, 5)):
+                for i in range(1, 5):
                     url = proxy_source["daili66"] + "{}.html".format(i)
                     urlcontent = requests.get(url, headers = generate_header())
                     proxies_table = BeautifulSoup(urlcontent.text, "lxml")
@@ -125,7 +124,7 @@ class proxies(object):
                 urlcontent = requests.get(url, headers = generate_header())
                 proxies_table = BeautifulSoup(urlcontent.text, "lxml")
                 trs = proxies_table.find_all("tr")
-                for i in tqdm(range(2, len(trs))):
+                for i in range(2, len(trs)):
                     tr = trs[i]
                     tds = tr.find_all("td")
                     ip = tds[0].text
@@ -140,7 +139,7 @@ class proxies(object):
                 urlcontent = requests.get(url, headers = generate_header())
                 proxies_table = BeautifulSoup(urlcontent.text, "lxml")
                 trs = proxies_table.find_all("tr")
-                for i in tqdm(range(2, len(trs))):
+                for i in range(2, len(trs)):
                     tr = trs[i]
                     tds = tr.find_all("td")
                     ip = tds[0].text

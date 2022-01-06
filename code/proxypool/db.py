@@ -43,3 +43,11 @@ def pass_data(cursor = cur, data:dict = None):
                                                                                                             data["response_time"], data["anonymity"], data["country"], 
                                                                                                             data["short_code"], data["google_passed"]))
         con.commit()
+
+def update_data(cursor = cur, data:dict = None):
+    """
+    update data in database
+    """
+    if data == None:
+        return ValueError("No data to update")
+    else:
