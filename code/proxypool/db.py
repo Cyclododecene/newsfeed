@@ -18,15 +18,15 @@ def create_db(cursor=cur):
     7. Country Short Code
     8. Google Passed or not 
     """
-cur.execute("create table Proxy(ID INTEGER PRIMARY KEY AUTOINCREMENT,\
-                                IP TEXT NOT NULL, \
-                                ProxyType TEXT,\
-                                Status TEXT,\
-                                ResponseTime FLOAT,\
-                                Anonymity TEXT, \
-                                Country TEXT,\
-                                ShortCode TEXT, \
-                                Google INT);")
+    cur.execute("create table Proxy(ID INTEGER PRIMARY KEY AUTOINCREMENT,\
+                                    IP TEXT NOT NULL, \
+                                    ProxyType TEXT,\
+                                    Status TEXT,\
+                                    ResponseTime FLOAT,\
+                                    Anonymity TEXT, \
+                                    Country TEXT,\
+                                    ShortCode TEXT, \
+                                    Google INT);")
 
 def pass_data(cursor = cur, data:dict=None):
     """
