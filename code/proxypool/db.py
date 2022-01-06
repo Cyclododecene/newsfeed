@@ -7,8 +7,8 @@ cur = con.cursor()
 # create database
 def create_db(cursor=cur):
     """
-    create table for  proxy with
-    1. RowID
+    create table for  proxy with:
+    1. RowID PRIMARY KEY - AUTO INCREMENT
     2. IP
     3. Proxy Type
     4. Status
