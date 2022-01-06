@@ -12,11 +12,12 @@ def create_db(cursor=cur):
     2. IP
     3. Proxy Type
     4. Status
-    4. Response Time
-    5. Anonymous Level
-    6. Country
-    7. Country Short Code
-    8. Google Passed or not 
+    5. Response Time
+    6. Anonymous Level
+    7. Country
+    8. Country Short Code
+    9. Google Passed or not 
+    10. ISP
     """
     try:
         cur.execute("select count(*) from Proxy")
@@ -29,7 +30,8 @@ def create_db(cursor=cur):
                                         Anonymity TEXT, \
                                         Country TEXT,\
                                         ShortCode TEXT, \
-                                        Google INT);")
+                                        Google INT, \
+                                        ISP TEXT);")
 
 def pass_data(cursor = cur, data:dict = None):
     """
@@ -39,15 +41,14 @@ def pass_data(cursor = cur, data:dict = None):
         return ValueError("No data to pass")
     #cur.execute('INSERT INTO Student VALUES(?,?,?,?,?)', (170141000,'亮','男',21,'滋麻开花'))
     else:
-        cur.execute("insert into Proxy values(NULL, '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}')".format(data["origin"], data["type"], data["status"], 
-                                                                                                            data["response_time"], data["anonymity"], data["country"], 
-                                                                                                            data["short_code"], data["google_passed"]))
+        cur.execute("insert into Proxy values(NULL, '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}')".format(data["origin"], data["type"], data["status"], 
+                                                                                                                data["response_time"], data["anonymity"], data["country"], 
+                                                                                                                data["short_code"], data["google_passed"], data["isp"]))
         con.commit()
 
+"""
 def update_data(cursor = cur, data:dict = None):
-    """
-    update data in database
-    """
     if data == None:
         return ValueError("No data to update")
     else:
+"""
