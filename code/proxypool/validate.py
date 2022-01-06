@@ -47,7 +47,7 @@ class validater(object):
                 start = time.time()
                 response = requests.get(self.http_validate_url, headers = generate_header(), proxies = proxies, timeout = 10)
                 if response.ok:
-                    status = True
+                    status = 1
                     response_time = round(time.time() - start,3)
                     resp_content = json.loads(response.text)
                     header, ip = resp_content["headers"], resp_content["origin"]
@@ -61,10 +61,10 @@ class validater(object):
                         
                     return status, response_time, anonymity
                 else:
-                    status = False
+                    status = 0
                     return status, response_time, anonymity
             except Exception as e:
-                status = False
+                status = 0
                 return status, response_time, anonymity
 
         elif proxy_type == "https":
@@ -72,7 +72,7 @@ class validater(object):
                 start = time.time()
                 response = requests.get(self.https_validate_url, headers = generate_header(), proxies = proxies, timeout = 10)
                 if response.ok:
-                    status = True
+                    status = 1
                     response_time = round(time.time() - start,3)
                     resp_content = json.loads(response.text)
                     header, ip = resp_content["headers"], resp_content["origin"]
@@ -86,10 +86,10 @@ class validater(object):
                         
                     return status, response_time, anonymity
                 else:
-                    status = False
+                    status = 0
                     return status, response_time, anonymity
             except Exception as e:
-                status = False
+                status = 0
                 return status, response_time, anonymity
 
         elif proxy_type == "socks5":
@@ -97,7 +97,7 @@ class validater(object):
                 start = time.time()
                 response = requests.get(self.https_validate_url, headers = generate_header(), timeout = 10)
                 if response.ok:
-                    status = True
+                    status = 1
                     response_time = round(time.time() - start,3)
                     resp_content = json.loads(response.text)
                     header, ip = resp_content["headers"], resp_content["origin"]
@@ -111,10 +111,10 @@ class validater(object):
                         
                     return status, response_time, anonymity
                 else:
-                    status = False
+                    status = 0
                     return status, response_time, anonymity
             except Exception as e:
-                status = False
+                status = 0
                 return status, response_time, anonymity
 
     #TODO: validate ip location
@@ -128,14 +128,14 @@ class validater(object):
         return country, short_code
     
     def _validate_google(self, proxies:dict):
-        google_passed = False
+        google_passed = 0
         try:
             urlcontent = requests.get("https://google.com", proxies = proxies, timeout = 10)
             if urlcontent.ok:
-                google_passed = True
+                google_passed = 1
                 return google_passed
             else:
-                google_passed = False
+                google_passed = 0
                 return google_passed
                 
         except Exception as e:
@@ -167,7 +167,7 @@ class validater(object):
                 response_time = https_response_time
             else:
                 proxy_type = proxy_type
-                status = False
+                status = 0
                 response_time = -1
                 anonymity = -1
             
