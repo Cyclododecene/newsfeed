@@ -11,8 +11,13 @@ proxy_source = {
     "ip3366":"http://www.ip3366.net/free/?",
     "jiangxianli":"https://ip.jiangxianli.com/api/proxy_ips?",
     "nimadaili":"http://nimadaili.com/",
-    "daili66":"http://www.66ip.cn/"
+    "daili66":"http://www.66ip.cn/",
+    "proxy-list": "https://www.proxy-list.download/api/v1/get?",
+    "spys":"https://spys.one/en/"
 }
+
+def country_code():
+    print("https://www.nationsonline.org/oneworld/country_code_list.htm")
 
 anonymity = {
     4:"elite",
@@ -72,7 +77,7 @@ class proxies(object):
                 proxies_list.append(tmp_proxies_list["data"][i]["ip"] + ":" + tmp_proxies_list["data"][i]["port"])
             return proxies_list
         
-        if self.source_name == "jiangxianli":
+        elif self.source_name == "jiangxianli":
             proxies_list = []
             for i in range(1, 3):
                 url = proxy_source["jiangxianli"] + "page=1&orderby&order_by=created_at&order_rule=DESC"
@@ -81,7 +86,7 @@ class proxies(object):
                     proxies_list.append(urlcontent.json()["data"]["data"][i]["ip"] + ":" + urlcontent.json()['data']['data'][i]["port"])
             return proxies_list
 
-        if self.source_name == "nimadaili":
+        elif self.source_name == "nimadaili":
             if self.proxy_type == "https":
                 tmp_proxies_list = []
                 for i in range(1, 5):
@@ -101,7 +106,7 @@ class proxies(object):
                 proxies_list = [item for sublist in tmp_proxies_list for item in sublist]
                 return proxies_list
         
-        if self.source_name == "daili66":
+        elif self.source_name == "daili66":
             if self.country != "HK" and self.country != "TW" and self.country != "MU":
                 proxies_list = []
                 for i in range(1, 5):
@@ -146,7 +151,33 @@ class proxies(object):
                     port = tds[1].text
                     proxies_list.append("%s:%s" % (ip, port))
 
-                return proxies_list          
+                return proxies_list       
+
+        elif self.source_name == "proxy-list":
+            proxies_list = []
+            url = proxy_source["proxy-list"] + "type={}&anon={}&country={}".format(self.proxy_type, self.anonymity, self.country)
+            urlcontent = requests.get(url, headers = generate_header())
+            proxy_pattern = re.compile("\d+\.\d+\.\d+\.\d+:\d+")
+            proxies_list.append(proxy_pattern.findall(urlcontent.text))
+            return proxies_list
+        
+        elif self.source_name == "spys":
+            proxies_list = []
+            if self.proxy_type == "https":
+                url = proxy_source["spys"] + "https-proxy-list/"
+            elif self.proxy_type == "http":
+                url = proxy_source["spys"] + "http-proxy-list/"
+            elif self.proxy_type == "socks5":
+                url = proxy_source["spys"] + "socks-proxy-list/"
+            urlcontent = requests.get(url, headers = generate_header())
+            proxies_table = BeautifulSoup(urlcontent.text, "lxml")
+            proxy_pattern = re.compile("\d+\.\d+\.\d+\.\d+:\d+")
+            proxies_list.append(proxy_pattern.findall(str(proxies_table)))
+            return proxies_list
+
+
+        
+
 
 
 if __name__ == "__main__":
