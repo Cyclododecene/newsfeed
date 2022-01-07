@@ -115,7 +115,6 @@ if __name__ == "__main__":
         try:
             combined_list_proxydb = proxydb()
             multiprocess_validate(cursor = cur, connect = con, proxy_list = combined_list_proxydb, num_processes=4)
-            update_adapted_db(cursor = cur, connect = con)
         except Exception as e:
             print(e)
             pass
@@ -123,16 +122,15 @@ if __name__ == "__main__":
         try:
             combined_list_geonode = geonode()
             multiprocess_validate(cursor = cur, connect = con, proxy_list = combined_list_geonode, num_processes=4)
-            update_adapted_db(cursor = cur, connect = con)
         except Exception as e:
             print(e)
             pass
         try:
             combined_list_other = other_proxy()
             multiprocess_validate(cursor = cur, connect = con, proxy_list = combined_list_other, num_processes=4)
-            update_adapted_db(cursor = cur, connect = con)
         except Exception as e:
             print(e)
             pass
         
+        update_adapted_db(cursor = cur, connect = con)
         time.sleep(600)
