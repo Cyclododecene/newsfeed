@@ -1,7 +1,11 @@
 import sqlite3
 
 # create database
+<<<<<<< HEAD
 def create_db(cursor = None, db_name = "Proxy"):
+=======
+def create_db(cursor=cur, db_name="Proxy"):
+>>>>>>> c8e34eeff2153189cb65c9250f5488c81f6174d9
     """
     create table for  proxy with:
     1. RowID PRIMARY KEY - AUTO INCREMENT
@@ -16,9 +20,15 @@ def create_db(cursor = None, db_name = "Proxy"):
     10. ISP
     """
     try:
+<<<<<<< HEAD
         cursor.execute("select count(*) from {}".format(db_name))
     except Exception as e:
         cursor.execute("create table {}(ID INTEGER PRIMARY KEY AUTOINCREMENT,\
+=======
+        cur.execute("select count(*) from {}".format(db_name))
+    except Exception as e:
+        cur.execute("create table {}(ID INTEGER PRIMARY KEY AUTOINCREMENT,\
+>>>>>>> c8e34eeff2153189cb65c9250f5488c81f6174d9
                                         IP TEXT NOT NULL, \
                                         ProxyType TEXT,\
                                         Status TEXT,\
@@ -49,6 +59,7 @@ def update_data(cursor = cur, data:dict = None):
     else:
 """
 
+<<<<<<< HEAD
 def update_adapted_db(cursor = None, connect = None,  source_db:str = "Proxy", target_db:str = "AdaptedProxy") -> int:
     cursor.execute("DROP TABLE IF EXISTS {};".format(target_db))
     create_db(cursor = cursor, db_name = target_db)
@@ -80,6 +91,25 @@ def random_get_db_data(cursor=None, db_name:str = "AdaptedProxy", proxy_type: st
     cursor.execute('''SELECT * FROM %s WHERE ProxyType = '%s' ORDER BY RANDOM() LIMIT %d''' % (db_name, proxy_type, int(num)))
     return cursor.fetchall()
 
+=======
+def update_adapted_db(cursor = cur, source_db:str = "Proxy", target_db:str = "AdaptedProxy") -> int:
+    cur.execute("DROP TABLE IF EXISTS {};".format(target_db))
+    create_db(cursor = cur, db_name = target_db)
+    cur.execute("INSERT INTO {} SELECT * FROM {} WHERE Status = 1 GROUP BY IP".format(target_db, source_db))
+    con.commit()
+    return 1
+
+def update_db_data(cursor = cur, db_name:str = "Proxy", data:dict = None):
+    if data == None:
+        return ValueError("No data to update")
+    else:
+        cur.execute("UPDATE {} SET Status = {} WHERE ID = '{}'".format(db_name, data["status"], data["ID"]))
+        return 1
+
+def select_db_data(cursor = cur, db_name:str = "Proxy", condition:str = "ID = 1") -> list:
+    cur.execute("SELECT * FROM {} WHERE {}".format(db_name, condition))
+    return cur.fetchall()
+>>>>>>> c8e34eeff2153189cb65c9250f5488c81f6174d9
 
 
 if __name__ == "__main__":
