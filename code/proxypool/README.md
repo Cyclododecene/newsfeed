@@ -43,6 +43,26 @@ create_db(cursor = cur)
 pass_data(cursor = cur, data = proxies)
 ```
 
+## HOWTO
+
+### Local Deployment
+
+```shell
+git clone https://github.com/Cyclododecene/GNAF.git
+cd code/proxypool
+
+python -m pip install requests fake-useragent pathos flask Flask-Limiter
+python main.py && python api.py
+```
+
+
+### Use Our Demo
+
+```python
+import requests
+response = requests.get("http://data.cklau.ac.cn/proxy/api/v1.0/getdata?ProxyType=socks5&Num=5")
+proxies_list = response.json()
+```
 
 ## TODO
 

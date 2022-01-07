@@ -110,6 +110,7 @@ def validate_status():
 if __name__ == "__main__":
     con = sqlite3.connect("data/proxy.db")
     cur = con.cursor()
+    create_db(db_name = "Proxy")
     while True:
         try:
             combined_list_proxydb = proxydb()

@@ -3,7 +3,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from db import * 
 
-app = Flask(__name__)
+app = Flask("proxy_pool")
 limiter = Limiter(
     app,
     key_func=get_remote_address,
@@ -28,6 +28,12 @@ def get_proxy():
     
     return jsonify({"data":proxy_list})
 
+@app.route("/info", methods=["GET", "POST"])
+@limiter.limit("10 per minute")
+def info():
+    keys = ["IP", "ProxyType", "Status", "ResponseTime", "Anonymity", "Country", "ShortCode", "Google", "ISP"]
+    
+    return jsonify({"return info":keys, "parameters":{"ProxyType":"http-https, https, http, socks5", "Num":"1-100"}})
 
 if __name__ == "__main__":
     app.run()
