@@ -1,11 +1,7 @@
-from multiprocessing.sharedctypes import Value
 import sqlite3
 
-con = sqlite3.connect("data/proxy.db")
-cur = con.cursor()
-
 # create database
-def create_db(cursor=cur):
+def create_db(cursor = None, db_name = "Proxy"):
     """
     create table for  proxy with:
     1. RowID PRIMARY KEY - AUTO INCREMENT
@@ -20,9 +16,9 @@ def create_db(cursor=cur):
     10. ISP
     """
     try:
-        cur.execute("select count(*) from Proxy")
+        cursor.execute("select count(*) from {}".format(db_name))
     except Exception as e:
-        cur.execute("create table Proxy(ID INTEGER PRIMARY KEY AUTOINCREMENT,\
+        cursor.execute("create table {}(ID INTEGER PRIMARY KEY AUTOINCREMENT,\
                                         IP TEXT NOT NULL, \
                                         ProxyType TEXT,\
                                         Status TEXT,\
@@ -31,9 +27,9 @@ def create_db(cursor=cur):
                                         Country TEXT,\
                                         ShortCode TEXT, \
                                         Google INT, \
-                                        ISP TEXT);")
+                                        ISP TEXT);".format(db_name))
 
-def pass_data(cursor = cur, data:dict = None):
+def pass_data(cursor = None, connect = None, data:dict = None):
     """
     pass data to database
     """
@@ -41,10 +37,10 @@ def pass_data(cursor = cur, data:dict = None):
         return ValueError("No data to pass")
     #cur.execute('INSERT INTO Student VALUES(?,?,?,?,?)', (170141000,'亮','男',21,'滋麻开花'))
     else:
-        cur.execute("insert into Proxy values(NULL, '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}')".format(data["origin"], data["type"], data["status"], 
+        cursor.execute("insert into Proxy values(NULL, '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}')".format(data["origin"], data["type"], data["status"], 
                                                                                                                 data["response_time"], data["anonymity"], data["country"], 
                                                                                                                 data["short_code"], data["google_passed"], data["isp"]))
-        con.commit()
+        connect.commit()
 
 """
 def update_data(cursor = cur, data:dict = None):
@@ -52,3 +48,39 @@ def update_data(cursor = cur, data:dict = None):
         return ValueError("No data to update")
     else:
 """
+
+def update_adapted_db(cursor = None, connect = None,  source_db:str = "Proxy", target_db:str = "AdaptedProxy") -> int:
+    cursor.execute("DROP TABLE IF EXISTS {};".format(target_db))
+    create_db(cursor = cursor, db_name = target_db)
+    cursor.execute("INSERT INTO {} SELECT * FROM {} WHERE Status = 1 GROUP BY IP".format(target_db, source_db))
+    connect.commit()
+    return 1
+
+def update_db_data(cursor = None, db_name:str = "Proxy", data:dict = None):
+    if data == None:
+        return ValueError("No data to update")
+    else:
+        cursor.execute("UPDATE {} SET Status = {} WHERE ID = '{}'".format(db_name, data["status"], data["ID"]))
+        return 1
+
+def select_db_data(cursor = None, db_name:str = "Proxy", condition:str = "ID = 1") -> list:
+    cursor.execute("SELECT * FROM {} WHERE {}".format(db_name, condition))
+    return cursor.fetchall()
+
+def get_db_data(cursor=None, db_name:str = "Proxy", condition:bool=False, data:str = None):
+    if condition == True and data == None:
+        return ValueError("No data to get")
+    elif condition == False or data == None:
+        cursor.execute("SELECT * FROM {}".format(db_name))
+        return cursor.fetchall()
+    else:
+        cursor.execute("SELECT * FROM {} WHERE {}".format(db_name, data))
+
+def random_get_db_data(cursor=None, db_name:str = "AdaptedProxy", proxy_type: str = "http-https", num:int = 1) -> list:
+    cursor.execute('''SELECT * FROM %s WHERE ProxyType = '%s' ORDER BY RANDOM() LIMIT %d''' % (db_name, proxy_type, int(num)))
+    return cursor.fetchall()
+
+
+
+if __name__ == "__main__":
+    create_db(db_name = "Proxy")
