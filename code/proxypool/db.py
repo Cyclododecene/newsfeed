@@ -76,8 +76,8 @@ def get_db_data(cursor=None, db_name:str = "Proxy", condition:bool=False, data:s
     else:
         cursor.execute("SELECT * FROM {} WHERE {}".format(db_name, data))
 
-def random_get_db_data(cursor=None, db_name:str = "AdaptedProxy", proxy_type: str = "http-https", num:int = 1) -> list:
-    cursor.execute('''SELECT * FROM %s WHERE ProxyType = '%s' ORDER BY RANDOM() LIMIT %d''' % (db_name, proxy_type, int(num)))
+def random_get_db_data(cursor=None, db_name:str = "AdaptedProxy", proxy_type: str = "http-https", num:int = 1, short_code = "CN") -> list:
+    cursor.execute('''SELECT * FROM %s WHERE ProxyType = '%s' AND ShortCode= '%s' ORDER BY RANDOM() LIMIT %d''' % (db_name, proxy_type, short_code int(num)))
     return cursor.fetchall()
 
 
