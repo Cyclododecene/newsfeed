@@ -34,7 +34,7 @@ def multi_repeat(repeats: List[Tuple[int, str]], method: str) -> str:
     return method.join(to_repeat)
 
 
-class Doc_Filter:
+class Art_Filter:
     def __init__(
         self, start_date: Optional[str] = None, end_date: Optional[str] = None, num_records: int = 250,
         keyword: Optional[Filter] = None, domain: Optional[Filter] = None,

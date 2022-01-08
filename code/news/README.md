@@ -10,10 +10,10 @@ The URL encoding reference: [url encode](https://www.eso.org/~ndelmott/url_encod
 ## Articles 
 
 ```python
-from code.api.filters import * 
-from code.api.api import * 
+from news.filters import * 
+from news.query import * 
 
-f = Filter(
+f = Art_Filter(
     keyword = ["Exchange Rate", "World"],
     start_date = "2021-05-09-00-00-00",
     end_date = "2021-05-12-00-00-00",
