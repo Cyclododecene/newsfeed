@@ -90,4 +90,8 @@ results_v2_events = gdelt_events_v2_events.query()
 # GDELT Event Database Version 2.0 - Mentions
 gdelt_events_v2_mentions = Event_V2(start_date = "2021-01-01", end_date = "2021-01-02", table = "mentions")
 results_v2_mentions = gdelt_events_v2_mentions.query()
+
+# GDELT GKG Database Version 1.0
+gdelt_events_v1_gkg = Gkg_V1(start_date = "2021-01-01", end_date = "2021-01-02")
+results_v1_gkg = gdelt_events_v1_gkg.query()
 ```
