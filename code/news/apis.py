@@ -29,7 +29,9 @@ from datetime import datetime, timedelta
 import pandas as pd
 import requests
 import json
+import gzip
 import re
+import io
 
 def text_regex(str_1, str_2, newstring, text):
     reg = "%s(.*?)%s" % (str_1,str_2)
@@ -114,3 +116,4 @@ def timeline_search(query_filter = None, max_recursion_depth:int = 100, query_mo
     timeline = doc_query_search(query_string = tmp_query_string, max_recursion_depth = max_recursion_depth, mode = query_mode)
     timeline["date"] = pd.to_datetime(timeline["date"], format="%Y%m%dT%H%M%SZ")
     return timeline
+

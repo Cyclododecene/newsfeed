@@ -1,4 +1,6 @@
-# API
+# About
+
+## API
 
 Based on the [gdelt-doc-api](https://github.com/alex9smith/gdelt-doc-api/), we consider a continuous querying mechanism by spliting the time range into multiple sub range (default setting is every 60 minutes).
 
@@ -7,15 +9,38 @@ Based on the [gdelt-doc-api](https://github.com/alex9smith/gdelt-doc-api/), we c
 
 The URL encoding reference: [url encode](https://www.eso.org/~ndelmott/url_encode.html)
 
+
  - [x] [GDELT DOC 2.0 API](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/)
- - [ ] [GDELT GKG API](https://blog.gdeltproject.org/announcing-our-first-api-gkg-geojson/)
+ - [ ] [GDELT Article List](https://blog.gdeltproject.org/announcing-the-gdelt-article-list-rss-feed/)
+ - [ ] [GDELT GEO 2.0 API](https://blog.gdeltproject.org/gdelt-geo-2-0-api-debuts/)
  - [ ] [GDELT TV API](https://blog.gdeltproject.org/gdelt-2-0-television-api-debuts/)
 
-## Articles 
+## Database Query
+
+### GDELT 1.0
+
+ - [ ] [GDELT Events Database 1.0](http://data.gdeltproject.org/events/index.html)
+ - [ ] [GDELT Global Knowledge Graph 1.0](http://data.gdeltproject.org/gkg/index.html)
+
+### GDELT 2.0
+
+ - [ ] [GDELT Events Database 2.0](https://blog.gdeltproject.org/gdelt-2-0-our-global-world-in-realtime/)
+ - [ ] [GDELT Global Knowledge Graph 2.0](https://blog.gdeltproject.org/gdelt-2-0-our-global-world-in-realtime/)
+
+### GDELT Others
+- [ ] [GDELT Different Graph](https://blog.gdeltproject.org/announcing-the-gdelt-global-difference-graph-gdg-planetary-scale-change-detection-for-the-global-news-media/)  
+- [ ] [GDELT Global Frontpage Graph](https://blog.gdeltproject.org/announcing-gdelt-global-frontpage-graph-gfg/)
+- [ ] [GDELT Global Entity Graph](https://blog.gdeltproject.org/announcing-the-global-entity-graph-geg-and-a-new-11-billion-entity-dataset/)
+
+## API 
+
+### Doc API
+
+#### For Article query:
 
 ```python
-from news.filters import * 
-from news.query import * 
+from apis.filters import * 
+from apis.query import * 
 
 f = Art_Filter(
     keyword = ["Exchange Rate", "World"],
@@ -27,12 +52,11 @@ f = Art_Filter(
 articles_30 = article_search(query_filter = f, max_recursion_depth = 100, time_range = 30)
 articles_60 = article_search(query_filter = f, max_recursion_depth = 100, time_range = 60)
 ```
-
-## Timeline Search
+#### For Timeline query:
 
 ```python
-from news.filters import * 
-from news.query import * 
+from apis.filters import * 
+from apis.query import * 
 
 f = Art_Filter(
     keyword = ["China", "United State"],
