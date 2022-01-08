@@ -20,7 +20,7 @@ The URL encoding reference: [url encode](https://www.eso.org/~ndelmott/url_encod
 ### GDELT 1.0
 
  - [x] [GDELT Events Database 1.0](http://data.gdeltproject.org/events/index.html)
- - [ ] [GDELT Global Knowledge Graph 1.0](http://data.gdeltproject.org/gkg/index.html)
+ - [x] [GDELT Global Knowledge Graph 1.0](http://data.gdeltproject.org/gkg/index.html)
 
 ### GDELT 2.0
 
@@ -33,9 +33,9 @@ The URL encoding reference: [url encode](https://www.eso.org/~ndelmott/url_encod
 - [ ] [GDELT Global Frontpage Graph](https://blog.gdeltproject.org/announcing-gdelt-global-frontpage-graph-gfg/)
 - [ ] [GDELT Global Entity Graph](https://blog.gdeltproject.org/announcing-the-global-entity-graph-geg-and-a-new-11-billion-entity-dataset/)
 
-## API 
+## HOWTO
 
-### Doc API
+### APIs
 
 #### For Article query:
 
@@ -56,8 +56,8 @@ articles_60 = article_search(query_filter = f, max_recursion_depth = 100, time_r
 #### For Timeline query:
 
 ```python
-from news.apis.filters import * 
-from news.apis.query import * 
+from code.news.apis.filters import * 
+from code.news.apis.query import * 
 
 f = Art_Filter(
     keyword = ["Exchange Rate", "World"],
@@ -73,3 +73,21 @@ query_mode:
 * timeline: `timelinevol`, `timelinevolraw`, `timelinetone`, `timelinelang`, `timelinesourcecountry`
 
 most of the parameters are the same with [gdelt-doc-api](https://github.com/alex9smith/gdelt-doc-api/), however, to specify the precise date range, we remove the `timespan` and use `start_date` and `time_range` for iteratively collecting articles.
+
+
+### Database Query
+
+```python
+from code.news.database.events import *
+# GDELT Event Database Version 1.0
+gdelt_events_v1_events = Event_V1(start_date = "2021-01-01", end_date = "2021-01-02")
+results_v1_events = gdelt_events_v1_events.query()
+
+# GDELT Event Database Version 2.0 - Event
+gdelt_events_v2_events = Event_V2(start_date = "2021-01-01", end_date = "2021-01-02")
+results_v2_events = gdelt_events_v2_events.query()
+
+# GDELT Event Database Version 2.0 - Mentions
+gdelt_events_v2_mentions = Event_V2(start_date = "2021-01-01", end_date = "2021-01-02", table = "mentions")
+results_v2_mentions = gdelt_events_v2_mentions.query()
+```

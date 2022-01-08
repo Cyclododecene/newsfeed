@@ -46,7 +46,7 @@ class Event_V1(object):
         webpage = html.fromstring(page.content)
         url_list = webpage.xpath("//a/@href")
         #url_list = [item for item in url_list if len(item) == 23] report other url
-        download_url_list = list(filter(lambda x: x[0:8] >= self.start_date and x[0:8] <= self.end_date, url_list))
+        download_url_list = list(filter(lambda x: x[0:8] >= self.start_date and x[0:8] < self.end_date, url_list))
 
         return download_url_list
 
@@ -129,12 +129,12 @@ class Event_V2(object):
             if self.table == "events":
                 url_list = list(page[page["url"].str.contains("export")]["url"])
                 del page
-                download_url_list = list(filter(lambda x: x[37:51] >= self.start_date and x[37:51] <= self.end_date, url_list))
+                download_url_list = list(filter(lambda x: x[37:51] >= self.start_date and x[37:51] < self.end_date, url_list))
                 return download_url_list
             else:
                 url_list = list(page[page["url"].str.contains("mentions")]["url"])
                 del page
-                download_url_list = list(filter(lambda x: x[37:51] >= self.start_date and x[37:51] <= self.end_date, url_list))
+                download_url_list = list(filter(lambda x: x[37:51] >= self.start_date and x[37:51] < self.end_date, url_list))
                 return download_url_list
 
     def _download_file(self, url:str="20220108160000.export.CSV.zip"):
