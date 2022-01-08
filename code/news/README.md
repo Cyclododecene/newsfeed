@@ -39,13 +39,13 @@ The URL encoding reference: [url encode](https://www.eso.org/~ndelmott/url_encod
 #### For Article query:
 
 ```python
-from apis.filters import * 
-from apis.query import * 
+from news.apis.filters import * 
+from news.apis.query import * 
 
 f = Art_Filter(
     keyword = ["Exchange Rate", "World"],
-    start_date = "2017-01-01-00-00-00",
-    end_date = "2021-12-31-00-00-00",
+    start_date = "2021-12-31-00-00-00",
+    end_date = "2021-12-31-01-00-00",
     country = ["China", "US"]
 )
 
@@ -55,8 +55,8 @@ articles_60 = article_search(query_filter = f, max_recursion_depth = 100, time_r
 #### For Timeline query:
 
 ```python
-from apis.filters import * 
-from apis.query import * 
+from news.apis.filters import * 
+from news.apis.query import * 
 
 f = Art_Filter(
     keyword = ["China", "United State"],
