@@ -2,7 +2,7 @@
 
 GNAF: GDELT News Aggregation and Feed
 
-## News Query
+## News Query (based on GDELT)
 
 Check [query](https://github.com/Cyclododecene/GNAF/blob/main/code/news/README.md)
 
