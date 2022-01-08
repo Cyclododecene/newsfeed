@@ -7,6 +7,10 @@ Based on the [gdelt-doc-api](https://github.com/alex9smith/gdelt-doc-api/), we c
 
 The URL encoding reference: [url encode](https://www.eso.org/~ndelmott/url_encode.html)
 
+ - [x] [GDELT DOC 2.0 API](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/)
+ - [ ] [GDELT GKG API](https://blog.gdeltproject.org/announcing-our-first-api-gkg-geojson/)
+ - [ ] [GDELT TV API](https://blog.gdeltproject.org/gdelt-2-0-television-api-debuts/)
+
 ## Articles 
 
 ```python
@@ -15,8 +19,8 @@ from news.query import *
 
 f = Art_Filter(
     keyword = ["Exchange Rate", "World"],
-    start_date = "2021-05-09-00-00-00",
-    end_date = "2021-05-12-00-00-00",
+    start_date = "2017-01-01-00-00-00",
+    end_date = "2021-12-31-00-00-00",
     country = ["China", "US"]
 )
 
@@ -27,13 +31,13 @@ articles_60 = article_search(query_filter = f, max_recursion_depth = 100, time_r
 ## Timeline Search
 
 ```python
-from code.api.filters import *
-from code.api.api import * 
+from news.filters import * 
+from news.query import * 
 
-f = Doc_Filter(
-    keyword = ["Exchange Rate", "World"],
-    start_date = "2021-05-09-00-00-00",
-    end_date = "2021-05-12-00-00-00",
+f = Art_Filter(
+    keyword = ["China", "United State"],
+    start_date = "2017-01-01-00-00-00",
+    end_date = "2021-12-31-00-00-00",
     country = ["China", "US"]
 )
 
@@ -45,5 +49,3 @@ query_mode:
 * timeline: `timelinevol`, `timelinevolraw`, `timelinetone`, `timelinelang`, `timelinesourcecountry`
 
 most of the parameters are the same with [gdelt-doc-api](https://github.com/alex9smith/gdelt-doc-api/), however, to specify the precise date range, we remove the `timespan` and use `start_date` and `time_range` for iteratively collecting articles.
-
-## GEO Search
