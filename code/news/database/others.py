@@ -106,16 +106,15 @@ class VGEG(object):
             download_url_list = list(page["url"])
             return download_url_list
         else:
+            url_list = page[page['url'].str.contains(self.domain)]
             if self.raw == True:
-                url_list = page[page['url'].str.contains(self.domain)]
                 download_url_list = list(url_list[url_list["url"].str.contains("raw")]["url"])
                 if download_url_list == []:
                     return ValueError("There is no data of {} in {}, please check your input again".format(self.domain, url))
                 else:
                     return download_url_list
-            else:
-                url_list = page[page['url'].str.contains(self.domain)]
-                download_url_list = list(url_list[url_list["url"].str.contains("vgeg")]["url"])
+            elif self.raw == False:
+                download_url_list = list(url_list[url_list["url"].str.contains("vgeg.v2")]["url"])
                 if download_url_list == []:
                     return ValueError("There is no data of {} in {}, please check your input again".format(self.domain, url))
                 else:
@@ -163,5 +162,10 @@ class VGEG(object):
 
 
 if __name__ == "__main__":
+    # GDELT Global Entity Graph
     gdelt_v3_geg = GEG(start_date = "2020-01-01", end_date = "2020-01-02")
     gdelt_v3_geg_result = gdelt_v3_geg.query()
+
+    # GDELT Visual Global Entity Graph
+    gdelt_v3_vgeg = VGEG(query_date = "2020-01-01", domain = "CNN")
+    gdelt_v3_vgeg_result = gdelt_v3_vgeg.query() 
