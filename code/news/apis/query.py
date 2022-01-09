@@ -76,7 +76,6 @@ def doc_query_search(query_string = None, max_recursion_depth: int = 100, mode =
             elif mode == "timelinevol" or "timelinevolraw" or "timelinetone" or "timelinetone" or "timelinelang" or "timelinesourcecountry":
                 return pd.DataFrame(load_json(response.text)["timeline"][0]["data"])
 
-
 def article_search(query_filter = None, max_recursion_depth:int = 100, time_range:int = 60, proxy:dict=None):
     articles_list = []
 
@@ -116,4 +115,3 @@ def timeline_search(query_filter = None, max_recursion_depth:int = 100, query_mo
     timeline = doc_query_search(query_string = tmp_query_string, max_recursion_depth = max_recursion_depth, mode = query_mode)
     timeline["date"] = pd.to_datetime(timeline["date"], format="%Y%m%dT%H%M%SZ")
     return timeline
-

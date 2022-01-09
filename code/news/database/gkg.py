@@ -14,7 +14,7 @@ from fake_useragent import UserAgent
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-class Gkg_V1(object):
+class GKG_V1(object):
     base_url = "http://data.gdeltproject.org/gkg/"
     cpu_num = multiprocessing.cpu_count()
 
@@ -78,8 +78,8 @@ class Gkg_V1(object):
         except Exception as e:
             return e
 
-class Gkg_V2(object):
-    cpu_num = multiprocessing.cpu_count()
+class GKG_V2(object):
+    cpu_num = multiprocessing.cpu_count() * 2
 
     columns_name = ['GKGRECORDID', 'V2.1DATE', ' V2SOURCECOLLECTIONIDENTIFIER', ' V2SOURCECOMMONNAME', 'V2DOCUMENTIDENTIFIER', ' V1COUNTS', ' V2COUNTS', ' V1THEMES', 
                     'V2ENHANCEDTHEMES', ' V1LOCATIONS', ' V2ENHANCEDLOCATIONS', ' V1PERSONS', ' V2ENHANCEDPERSONS', ' V1ORGANIZATIONS', ' V2ENHANCEDORGANIZATIONS', 
@@ -179,10 +179,10 @@ for i in tqdm.tqdm(range(0, len(download_url_list))):
 if __name__ == "__main__":
     
     # GDELT GKG Database Version 1.0
-    gdelt_events_v1_gkg = Gkg_V1(start_date = "2021-01-01", end_date = "2021-01-02")
+    gdelt_events_v1_gkg = GKG_V1(start_date = "2021-01-01", end_date = "2021-01-02")
     results_v1_gkg = gdelt_events_v1_gkg.query()
 
     # GDELT GKG Database Version 2.0
-    gdelt_events_v2_gkg = Gkg_V2(start_date = "2021-01-01", end_date = "2021-01-02", translation = False)
+    gdelt_events_v2_gkg = GKG_V2(start_date = "2021-01-01", end_date = "2021-01-02", translation = False)
     results_v2_gkg = gdelt_events_v2_gkg.query()
 

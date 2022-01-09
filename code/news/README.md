@@ -11,9 +11,8 @@ The URL encoding reference: [url encode](https://www.eso.org/~ndelmott/url_encod
 
 
  - [x] [GDELT DOC 2.0 API](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/)
- - [ ] [GDELT Article List](https://blog.gdeltproject.org/announcing-the-gdelt-article-list-rss-feed/)
- - [ ] [GDELT GEO 2.0 API](https://blog.gdeltproject.org/gdelt-geo-2-0-api-debuts/)
- - [ ] [GDELT TV API](https://blog.gdeltproject.org/gdelt-2-0-television-api-debuts/)
+
+*GEO 2.0 and TV API can be founded in [gdelt.github.io](https://gdelt.github.io/)*
 
 ## Database Query
 
@@ -29,9 +28,9 @@ The URL encoding reference: [url encode](https://www.eso.org/~ndelmott/url_encod
  - [x] [GDELT Global Knowledge Graph 2.0](https://blog.gdeltproject.org/gdelt-2-0-our-global-world-in-realtime/)
 
 ### GDELT Others
+- [x] [GDELT Global Entity Graph](https://blog.gdeltproject.org/announcing-the-global-entity-graph-geg-and-a-new-11-billion-entity-dataset/)
 - [ ] [GDELT Different Graph](https://blog.gdeltproject.org/announcing-the-gdelt-global-difference-graph-gdg-planetary-scale-change-detection-for-the-global-news-media/)  
 - [ ] [GDELT Global Frontpage Graph](https://blog.gdeltproject.org/announcing-gdelt-global-frontpage-graph-gfg/)
-- [ ] [GDELT Global Entity Graph](https://blog.gdeltproject.org/announcing-the-global-entity-graph-geg-and-a-new-11-billion-entity-dataset/)
 
 ## HOWTO
 
@@ -96,11 +95,11 @@ results_v2_mentions = gdelt_events_v2_mentions.query()
 ```python
 from code.news.database.gkg import *
 # GDELT GKG Database Version 1.0
-gdelt_events_v1_gkg = Gkg_V1(start_date = "2021-01-01", end_date = "2021-01-02")
+gdelt_events_v1_gkg = GKG_V1(start_date = "2021-01-01", end_date = "2021-01-02")
 results_v1_gkg = gdelt_events_v1_gkg.query()
 
 from code.news.database.gkg import *
 # GDELT GKG Database Version 2.0
-gdelt_events_v2_gkg = Gkg_V2(start_date = "2021-01-01", end_date = "2021-01-02")
+gdelt_events_v2_gkg = GKG_V2(start_date = "2021-01-01", end_date = "2021-01-02")
 results_v2_gkg = gdelt_events_v2_gkg.query()
 ```
