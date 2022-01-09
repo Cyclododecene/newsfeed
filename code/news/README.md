@@ -100,7 +100,7 @@ gdelt_events_v1_gkg = Gkg_V1(start_date = "2021-01-01", end_date = "2021-01-02")
 results_v1_gkg = gdelt_events_v1_gkg.query()
 
 from code.news.database.gkg import *
-# GDELT GKG Database Version 1.0
+# GDELT GKG Database Version 2.0
 gdelt_events_v2_gkg = Gkg_V2(start_date = "2021-01-01", end_date = "2021-01-02")
 results_v2_gkg = gdelt_events_v2_gkg.query()
 ```
