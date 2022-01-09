@@ -56,8 +56,8 @@ articles_60 = article_search(query_filter = f, max_recursion_depth = 100, time_r
 #### For Timeline query:
 
 ```python
-from code.news.apis.filters import * 
-from code.news.apis.query import * 
+from GNAF.news.apis.filters import * 
+from GNAF.news.apis.query import * 
 
 f = Art_Filter(
     keyword = ["Exchange Rate", "World"],
@@ -79,7 +79,7 @@ most of the parameters are the same with [gdelt-doc-api](https://github.com/alex
 
 For event database (both V1 and V2)
 ```python
-from code.news.database.events import *
+from GNAF.news.database.events import *
 # GDELT Event Database Version 1.0
 gdelt_events_v1_events = Event_V1(start_date = "2021-01-01", end_date = "2021-01-02")
 results_v1_events = gdelt_events_v1_events.query()
@@ -97,12 +97,12 @@ results_v2_mentions = gdelt_events_v2_mentions.query()
 For GKG databse (both V1 and V2)
 
 ```python
-from code.news.database.gkg import *
+from GNAF.news.database.gkg import *
 # GDELT GKG Database Version 1.0
 gdelt_events_v1_gkg = GKG_V1(start_date = "2021-01-01", end_date = "2021-01-02")
 results_v1_gkg = gdelt_events_v1_gkg.query()
 
-from code.news.database.gkg import *
+from GNAF.news.database.gkg import *
 # GDELT GKG Database Version 2.0
 gdelt_events_v2_gkg = GKG_V2(start_date = "2021-01-01", end_date = "2021-01-02")
 results_v2_gkg = gdelt_events_v2_gkg.query()
@@ -111,7 +111,7 @@ results_v2_gkg = gdelt_events_v2_gkg.query()
 For GEG and VGEG:
 
 ```python
-from code.news.database.others import *
+from GNAF.news.database.others import *
 # GDELT Global Entity Graph
 gdelt_v3_geg = GEG(start_date = "2020-01-01", end_date = "2020-01-02")
 gdelt_v3_geg_result = gdelt_v3_geg.query()

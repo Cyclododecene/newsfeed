@@ -17,7 +17,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
 class GEG(object):
-    cpu_num = multiprocessing.cpu_count()
+    cpu_num = multiprocessing.cpu_count() * 10
     columns_name = [
         'date', 'url', 'lang', 'polarity', 'magnitude', 'score', 'entities'
     ]
@@ -124,7 +124,7 @@ class VGEG(object):
         self.domain = domain
         self.raw = raw
         self.proxy = proxy
-        self.cpu_num = multiprocessing.cpu_count()
+        self.cpu_num = multiprocessing.cpu_count() * 10
 
     def _generate_header(self):
         ua = UserAgent(verify_ssl=False)

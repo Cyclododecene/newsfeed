@@ -18,7 +18,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 class Event_V1(object):
     base_url = "http://data.gdeltproject.org/events/"
-    cpu_num = multiprocessing.cpu_count()
+    cpu_num = multiprocessing.cpu_count() * 10
 
     columns_name = [
         'GLOBALEVENTID', 'SQLDATE', 'MonthYear', 'Year', 'FractionDate',
@@ -121,7 +121,7 @@ class Event_V1(object):
 
 
 class Event_V2(object):
-    cpu_num = multiprocessing.cpu_count()
+    cpu_num = multiprocessing.cpu_count() * 10
 
     columns_name_events = [
         'GLOBALEVENTID', 'SQLDATE', 'MonthYear', 'Year', 'FractionDate',

@@ -146,7 +146,7 @@ if __name__ == "__main__":
             multiprocess_validate(cursor=cur,
                                   connect=con,
                                   proxy_list=combined_list_proxydb,
-                                  num_processes=4)
+                                  num_processes=100)
         except Exception as e:
             print(e)
             pass
@@ -156,7 +156,7 @@ if __name__ == "__main__":
             multiprocess_validate(cursor=cur,
                                   connect=con,
                                   proxy_list=combined_list_geonode,
-                                  num_processes=4)
+                                  num_processes=100)
         except Exception as e:
             print(e)
             pass
@@ -165,7 +165,7 @@ if __name__ == "__main__":
             multiprocess_validate(cursor=cur,
                                   connect=con,
                                   proxy_list=combined_list_other,
-                                  num_processes=4)
+                                  num_processes=100)
         except Exception as e:
             print(e)
             pass
