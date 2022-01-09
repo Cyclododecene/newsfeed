@@ -1,5 +1,11 @@
 # Proxy Pool
 
+## Why
+
+> A proxy pool allows us to make a higher volume of requests to a target website without being banned.
+
+Multiple open-source proxy pool solutions can be found in [GitHub](https://github.com/topics/proxypool), we *reivent the wheel* because most of the free proxy sources (or providers) are invalid, thus, we need some stable proxies (both in Mainland China and the other region/countries).
+
 ## Some Free Proxy Sources
 
 ```python
@@ -47,16 +53,26 @@ pass_data(cursor = cur, data = proxies)
 
 ### Local Deployment
 
+First, clone the code and install required packages:
+
 ```shell
 git clone https://github.com/Cyclododecene/GNAF.git
 cd code/proxypool
 
 python -m pip install requests fake-useragent pathos flask Flask-Limiter
-python main.py && python api.py
+```
+
+then, run both `main.py` and `api.py`
+
+```shell
+python main.py # in ttf1
+python api.py  # in ttf2
 ```
 
 
 ### Use Our Demo
+
+We also provide a public demo API for you, you can check [data.ckalu.ac.cn](https://data.cklau.ac.cn/proxy/api/v1.0/info):
 
 ```python
 import requests
