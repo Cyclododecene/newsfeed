@@ -21,6 +21,19 @@ proxy_source = {
 
 ## Components
 
+In general, there are four main components:
+1. *crawler* (`getproxy.py`) - Scrape the free `http, https, socsk5` from different valid providers
+2. *validation* (`validate.py`) - In this part, we validate the proxies'
+   1. validation
+   2. proxy type
+   3. response time
+   4. anonymity
+   5. Country name and Country Code
+   6. Check site access (For now, only [Google](https://google.com))
+   7. ISP - Internet Service Provider
+3. *storage* (`db.py`) - First, we store all the proxy we get into a table: `Proxy`, then, we validate the proxies and store all the passed proxies into another talbe: `AdaptedProxy` and delete the `Proxy`. In this way we can insure that the proxies in `AdaptedProxy` has high accessibility and since these proxies comes from the free providers, there is no reason we keep them forever.
+4. *api* (`api.py`) - We use `Flask` to generate a quick API
+
 ### proxy crawler
 
 ```python
@@ -70,17 +83,40 @@ python api.py  # in ttf2
 ```
 
 
-### Use Our Demo
+### Use Our Demo API
 
 We also provide a public demo API for you, you can check [data.ckalu.ac.cn](https://data.cklau.ac.cn/proxy/api/v1.0/info):
 
 ```python
 import requests
-response = requests.get("http://data.cklau.ac.cn/proxy/api/v1.0/getdata?ProxyType=socks5&Num=5")
+response = requests.get("https://data.cklau.ac.cn/proxy/api/v1.0/getdata?ProxyType=socks5&Num=1&Code=CN")
 proxies_list = response.json()
+### Example Return:
+#{
+#	"data": [{
+#		"Anonymity": "None",
+#		"Country": "China",
+#		"Google": 0,
+#		"IP": "27.156.80.128:16790",
+#		"ISP": "Chinanet",
+#		"ProxyType": "socks5",
+#		"ResponseTime": 2.685,
+#		"ShortCode": "CN",
+#		"Status": "1"
+#	}]
+#}
 ```
 
+
+
 ## TODO
+
+### Feature
+
+- [ ] Scan the specific IP's ports (only for oversea IP)
+- [ ] Check other sites access - [BBC](https://bbc.com/), [CNN](https://edition.cnn.com/), etc.
+
+### Artitecture 
 
 - [ ] use `selenium` for automation
 - [ ] use `redis` or other NoSQL database to replace `sqlite`

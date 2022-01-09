@@ -10,14 +10,24 @@ limiter = Limiter(
     default_limits=["1440000 per day", "60000 per hour"]
 )
 
-@app.route("/api/v1.0/proxy/info", methods=["GET", "POST"])
+@app.route("/api/v1.0/proxy/info", methods=["GET"])
 @limiter.limit("10 per minute")
 def info():
     return jsonify({"parameters":{"Code": "Short Code of Country or Region", "ProxyType":"http-https, https, http, socks5", "Num":"1-100"}, 
                     "return info": ["IP", "ProxyType", "Status", "ResponseTime", "Anonymity", "Country", "ShortCode", "Google", "ISP"] 
                     "example":"http://data.cklau.ac.cn/proxy/api/v1.0/getdata?ProxyType=socks5&Num=5i&Code=CN"})
 
-@app.route("/api/v1.0/proxy/getdata", methods=["GET", "POST"])
+@app.route("/api/v1.0/proxy/count", methods=["GET"])
+@limiter.limit("10 per minute")
+def count():
+    con = sqlite3.connect("data/proxy.db")
+    cur = con.cursor()
+    cur.execute("SELECT COUNT(*) FROM Proxy")
+    count = cur.fetchall()
+    con.close()
+    return jsonify({"count":count[0][0]})
+
+@app.route("/api/v1.0/proxy/getdata", methods=["GET"])
 @limiter.limit("100 per minute")
 def get_proxy():
     keys = ["IP", "ProxyType", "Status", "ResponseTime", "Anonymity", "Country", "ShortCode", "Google", "ISP"]
