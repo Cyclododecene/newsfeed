@@ -105,7 +105,7 @@ class Event_V2(object):
                                 'MentionDocTranslationInfo', "Extras"]
 
 
-    def __init__(self, start_date:str = "2020-01-01", end_date:str = "2021-12-31", table:str = "events", translation:bool = True, proxy:dict = None):
+    def __init__(self, start_date:str = "2020-01-01", end_date:str = "2021-12-31", table:str = "events", translation:bool = False, proxy:dict = None):
         self.start_date = "".join(start_date.split("-")) + "000000"
         self.end_date = "".join(end_date.split("-")) + "000000"
         self.table = table

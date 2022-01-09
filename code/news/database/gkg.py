@@ -87,7 +87,7 @@ class Gkg_V2(object):
                     ' V2ALLNAMES', ' V2AMOUNTS', ' V2TRANSLATIONINFO', ' V2EXTRASXML']
 
 
-    def __init__(self, start_date:str = "2020-01-01", end_date:str = "2021-12-31", translation:bool = True, proxy:dict = None):
+    def __init__(self, start_date:str = "2020-01-01", end_date:str = "2021-12-31", translation:bool = False, proxy:dict = None):
         self.start_date = "".join(start_date.split("-")) + "000000"
         self.end_date = "".join(end_date.split("-")) + "000000"
         self.translation = translation
@@ -160,7 +160,8 @@ class Gkg_V2(object):
             return e
 
 """
-page = pd.read_csv("http://data.gdeltproject.org/gdeltv2/masterfilelist.txt", sep = " ", engine = "c", na_filter = False, 
+### test ###
+page = pd.read_csv("http://data.gdeltproject.org/gdeltv2/masterfilelist-translation.txt", sep = " ", engine = "c", na_filter = False, 
                                 low_memory = False, names = ["a", "b", "url"])
 url_list = list(page[page["url"].str.contains("gkg")]["url"])
 download_url_list = list(filter(lambda x: x[37:51] >= "20210101000000" and x[37:51] < "20210102000000", url_list))

@@ -84,11 +84,11 @@ gdelt_events_v1_events = Event_V1(start_date = "2021-01-01", end_date = "2021-01
 results_v1_events = gdelt_events_v1_events.query()
 
 # GDELT Event Database Version 2.0 - Event
-gdelt_events_v2_events = Event_V2(start_date = "2021-01-01", end_date = "2021-01-02", translation = False)
+gdelt_events_v2_events = Event_V2(start_date = "2021-01-01", end_date = "2021-01-02")
 results_v2_events = gdelt_events_v2_events.query()
 
 # GDELT Event Database Version 2.0 - Mentions
-gdelt_events_v2_mentions = Event_V2(start_date = "2021-01-01", end_date = "2021-01-02", translation = False, table = "mentions")
+gdelt_events_v2_mentions = Event_V2(start_date = "2021-01-01", end_date = "2021-01-02", table = "mentions")
 results_v2_mentions = gdelt_events_v2_mentions.query()
 
 ```
