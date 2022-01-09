@@ -77,6 +77,7 @@ most of the parameters are the same with [gdelt-doc-api](https://github.com/alex
 
 ### Database Query
 
+For event database (both V1 and V2)
 ```python
 from code.news.database.events import *
 # GDELT Event Database Version 1.0
@@ -93,6 +94,8 @@ results_v2_mentions = gdelt_events_v2_mentions.query()
 
 ```
 
+For GKG databse (both V1 and V2)
+
 ```python
 from code.news.database.gkg import *
 # GDELT GKG Database Version 1.0
@@ -104,6 +107,8 @@ from code.news.database.gkg import *
 gdelt_events_v2_gkg = GKG_V2(start_date = "2021-01-01", end_date = "2021-01-02")
 results_v2_gkg = gdelt_events_v2_gkg.query()
 ```
+
+For GEG and VGEG:
 
 ```python
 from code.news.database.others import *
