@@ -7,7 +7,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+.vscode/
 # ignore database
 *.db
 *.sqlite3
