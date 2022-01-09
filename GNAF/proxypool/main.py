@@ -1,3 +1,8 @@
+"""
+author: Terence Junjie LIU
+start_date: Mon 27 Dec, 2021
+"""
+
 from concurrent.futures import process
 from getproxy import *
 from validate import *
