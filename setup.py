@@ -22,7 +22,7 @@ setup(
         'hpack==4.0.0', 'hyperframe==6.0.1', 'idna==3.3',
         'importlib-metadata==4.10.0', 'itsdangerous==1.1.0', 'Jinja2==2.11.3',
         'kaitaistruct==0.9', 'ldap3==2.8.1', 'lxml==4.7.1',
-        'MarkupSafe==2.0.1', 'mitmproxy==5.3.0', 'msgpack==1.0.3',
+        'MarkupSafe==2.0.1', 'mitmproxy==7.0.3', 'msgpack==1.0.3',
         'multiprocess==0.70.12.2', 'numpy==1.21.5', 'outcome==1.1.0',
         'packaging==21.3', 'pandas==1.3.5', 'passlib==1.7.4', 'pathos==0.2.8',
         'pipx==1.0.0', 'pox==0.3.0', 'ppft==1.6.6.4', 'protobuf==3.13.0',
