@@ -85,11 +85,11 @@ python api.py  # in ttf2
 
 ### Use Our Demo API
 
-We also provide a public demo API for you, you can check [data.ckalu.ac.cn](https://data.cklau.ac.cn/proxy/api/v1.0/info):
+We also provide a public demo API for you, you can check [data.ckalu.ac.cn](https://data.cklau.ac.cn/api/v1.0/proxy/info):
 
 ```python
 import requests
-response = requests.get("https://data.cklau.ac.cn/proxy/api/v1.0/getdata?ProxyType=socks5&Num=1&Code=CN")
+response = requests.get("https://data.cklau.ac.cn/api/v1.0/proxy/getdata?ProxyType=socks5&Num=1&Code=CN")
 proxies_list = response.json()
 ### Example Return:
 #{
