@@ -42,9 +42,9 @@ articles_e.reset_index(drop=True, inplace=True)
 def get_news(url):
     config = Config()
     config.browser_user_agent = generate_header()["User-Agent"]
-    config.request_timeout = 10
-    config.number_threads = 20
-    config.thread_timeout_seconds = 2
+    config.request_timeout = 50
+    config.number_threads = 60
+    config.thread_timeout_seconds = 10
     article = Article(url, config=config)
     article.download()
     article.parse()
@@ -53,40 +53,69 @@ def get_news(url):
         "authors": article.authors,
         "publish_date": article.publish_date,
         "text": article.text,
+        "url": url
     }
     return article_info
 
 
 ## directly get news from url
-result_direct = []
-for i in tqdm.tqdm(range(0, 10)):
-    url = articles_e.loc[i, "url"]
+def download_direct(url):
     try:
-        result_direct.append(get_news(url))
-    except:
-        continue
+        return get_news(url)
+    except Exception as e:
+        print("Error in downloading {} \n Error: \n{}".format(url, e))
+        pass  # return None
 
-result_direct = pd.DataFrame(result_direct)
 
 ## get news from url from internet archive
-result_archive = []
-for i in tqdm.tqdm(range(0, 10)):
-    url = articles_e.loc[i, "url"]
+def download_arxiv(url):
     url = url.split("//")[1]
     response = requests.get(
         "https://archive.org/wayback/available?url={}".format(url),
-        timeout=10,
+        timeout=20,
         headers=generate_header(),
         stream=True)
     response_json = response.json()
     if response_json["archived_snapshots"] == {}:
-        continue
+        print("No archive found")
+        pass  # return None
     else:
         archive_url = response_json["archived_snapshots"]["closest"]["url"]
         archive_url = archive_url.replace("http://", "https://")
         try:
-            result.append(get_news(archive_url))
-        except:
-            continue
+            return get_news(archive_url)
+        except Exception as e:
+            print("Error in downloading {} \n Error: \n{}".format(
+                archive_url, e))
+            pass  # return None
 
-result_archive = pd.DataFrame(result_archive)
+
+def check_url(url):
+    print("\n[+]Checking if page exists...")
+    try:
+        # Requesting for only the HTTP header without downloading the page
+        # If the page doesn't exist (404), it's a waste of resources to try scraping.
+        response = requests.head(url, timeout=10, headers=generate_header())
+        if "not found" in response.text:
+            return 404
+        else:
+            return int(response.status_code)
+    except:
+        print("Connection related Error/Timeout, skipping...")
+        return int(404)
+
+
+def download_news(url):
+    try:
+        if check_url(url=url) != 404:
+            return download_direct(url)
+        else:
+            return download_arxiv(url)
+    except Exception as e:
+        print(e)
+        pass  # return None
+
+
+result = []
+for i in tqdm.tqdm(range(0, 20)):
+    result.append(download_news(articles_e.loc[i, 'url']))
