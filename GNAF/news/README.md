@@ -14,7 +14,7 @@ The URL encoding reference: [url encode](https://www.eso.org/~ndelmott/url_encod
  - [ ] [GDELT GEO 2.0 API](https://blog.gdeltproject.org/gdelt-geo-2-0-api-debuts)
  - [ ] [GDELT TV 2.0 API](https://blog.gdeltproject.org/gdelt-2-0-television-api-debuts/)
   
-*NOTICE: DOC 2.0, GEO 2.0 and TV API can be founded in [gdelt.github.io](https://gdelt.github.io/)*
+*NOTICE: DOC 2.0, GEO 2.0 and TV API can be found in [gdelt.github.io](https://gdelt.github.io/)*
 
 ## Database Query
 
