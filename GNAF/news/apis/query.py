@@ -129,6 +129,8 @@ def article_search(query_filter=None,
                     max_recursion_depth=max_recursion_depth,
                     mode="artlist",
                     proxy=proxy)
+                timerange = [tmp_end_date_string] * len(tmp_articles)
+                tmp_articles["timerange"] = timerange
                 articles_list.append(tmp_articles)
                 # subsitute the query parameters (startdatetime)
                 tmp_start_date_string = "&startdatetime=" + datetime.strftime(
