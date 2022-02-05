@@ -1,5 +1,5 @@
 # NewsFeed
-
+![py_version](https://img.shields.io/badge/python-3.6+-brightgreen)
 
 
 ## Introduction
