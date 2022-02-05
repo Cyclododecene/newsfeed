@@ -1,5 +1,6 @@
 # NewsFeed
 ![py_version](https://img.shields.io/badge/python-3.6+-brightgreen)
+![GDLET_version](https://img.shields.io/badge/GDELT-V1&V2-orange)
 
 
 ## Introduction
