@@ -14,7 +14,6 @@ setup(
     author="Cyclododecene",
     author_email="terenceliu1012@outlook.com",
     url="https://github.com/Cyclododecene/GNAF",
-    packages=find_packages(),
     install_requires=[
         'tqdm', 'pandas', 'lxml', 'fake-useragent'
     ],
