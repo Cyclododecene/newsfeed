@@ -121,12 +121,12 @@ class GKG_V2(object):
     ]
 
     def __init__(self,
-                 start_date: str = "2020-01-01",
-                 end_date: str = "2021-12-31",
+                 start_date: str = "2020-01-01-00-00-00",
+                 end_date: str = "2021-12-31-00-00-00",
                  translation: bool = False,
                  proxy: dict = None):
-        self.start_date = "".join(start_date.split("-")) + "000000"
-        self.end_date = "".join(end_date.split("-")) + "000000"
+        self.start_date = "".join(start_date.split("-"))
+        self.end_date = "".join(end_date.split("-"))
         self.translation = translation
         self.proxy = proxy
 
