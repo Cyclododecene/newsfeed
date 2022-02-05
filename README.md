@@ -6,14 +6,14 @@
 
 Newsfeed based on GDELT Project
 
-### HOWTO
+### Installation
 
 ```shell
 conda create -n newsfeed python=3.7
 python setup install
 ```
 
-## API
+## GDELT API
 
 Based on the [gdelt-doc-api](https://github.com/alex9smith/gdelt-doc-api/), we consider a continuous querying mechanism by spliting the time range into multiple sub range (default setting is every 60 minutes).
 
@@ -29,7 +29,7 @@ The URL encoding reference: [url encode](https://www.eso.org/~ndelmott/url_encod
   
 *NOTICE: DOC 2.0, GEO 2.0 and TV API can be found in [gdelt.github.io](https://gdelt.github.io/)*
 
-## Database Query
+## GDELT Database Query
 
 ### GDELT 1.0
 
