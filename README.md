@@ -6,7 +6,7 @@
 
 Newsfeed based on GDELT Project
 
-## HOWTO
+### HOWTO
 
 ```shell
 conda create -n newsfeed python=3.7
