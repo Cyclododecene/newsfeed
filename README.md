@@ -136,3 +136,13 @@ gdelt_v3_geg_result = gdelt_v3_geg.query()
 gdelt_v3_vgeg = VGEG(query_date = "2020-01-01", domain = "CNN")
 gdelt_v3_vgeg_result = gdelt_v3_vgeg.query() 
 ```
+
+### Utils
+
+Full-text downloader (based on [`newspaper3k`](https://github.com/codelucas/newspaper) and [Wayback Machine](https://archive.org/help/wayback_api.php))
+
+```python
+from newsfeed.utils import fulltext as ft
+art = ft.download(url="https://english.news.cn/20220205/a4e93df9162e4053af64c392b5f5bfec/c.html")
+print("full text: \n {}".format(art.text))
+```
