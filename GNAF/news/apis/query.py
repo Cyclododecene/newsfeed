@@ -29,9 +29,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import requests
 import json
-import gzip
 import re
-import io
 
 
 def text_regex(str_1, str_2, newstring, text):

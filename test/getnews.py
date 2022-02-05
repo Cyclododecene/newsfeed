@@ -6,14 +6,9 @@
 ###                                            ###
 ##################################################
 
-import re
 import tqdm
-import random
 import requests
-import pandas as pd
-from random import randint
 from newspaper import Config
-from newspaper import Source
 from newspaper import Article
 from GNAF.news.apis.query import *
 from GNAF.news.apis.filters import *

@@ -4,15 +4,10 @@ start_date: Mon 27 Dec, 2021
 """
 
 import io
-from multiprocessing.sharedctypes import Value
-import os
-import re
 import time
 import tqdm
-import datetime
 import requests
 import pandas as pd
-from lxml import html
 import multiprocessing
 from fake_useragent import UserAgent
 

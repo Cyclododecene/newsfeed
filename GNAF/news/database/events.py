@@ -3,11 +3,9 @@ author: Terence Junjie LIU
 start_date: Mon 27 Dec, 2021
 modified: Sat 05 Jan, 2022
 """
-from multiprocessing.sharedctypes import Value
 import time
 import tqdm
 import requests
-import datetime
 import pandas as pd
 from lxml import html
 import multiprocessing
