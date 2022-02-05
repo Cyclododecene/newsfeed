@@ -123,13 +123,12 @@ def article_search(query_filter=None,
                                               str_2="&maxrecords",
                                               newstring=tmp_end_date_string,
                                               text=tmp_query_string)
-                print(tmp_query_string)
                 tmp_articles = doc_query_search(
                     query_string=tmp_query_string,
                     max_recursion_depth=max_recursion_depth,
                     mode="artlist",
                     proxy=proxy)
-                timerange = [tmp_end_date_string] * len(tmp_articles)
+                timerange = [tmp_end_date_string[13:27]] * len(tmp_articles)
                 tmp_articles["timerange"] = timerange
                 articles_list.append(tmp_articles)
                 # subsitute the query parameters (startdatetime)
@@ -141,6 +140,7 @@ def article_search(query_filter=None,
                                               newstring=tmp_start_date_string,
                                               text=tmp_query_string)
                 new_end_date = new_end_date + timedelta(minutes=time_range)
+                print("[+] {} & {}".format(tmp_start_date_string[1:29], tmp_end_date_string[1:27]))
 
             return pd.concat(articles_list).drop_duplicates().reset_index(
                 drop=True)
