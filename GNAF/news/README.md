@@ -92,7 +92,7 @@ gdelt_events_v2_events = Event_V2(start_date = "2021-01-01-00-00-00", end_date =
 results_v2_events = gdelt_events_v2_events.query()
 
 # GDELT Event Database Version 2.0 - Mentions
-gdelt_events_v2_mentions = Event_V2(start_date = "2021-01-01", end_date = "2021-01-02", table = "mentions")
+gdelt_events_v2_mentions = Event_V2(start_date = "2021-01-01-00-00-00", end_date = "2021-01-02-00-00-00", table = "mentions")
 results_v2_mentions = gdelt_events_v2_mentions.query()
 
 ```
@@ -107,7 +107,7 @@ results_v1_gkg = gdelt_events_v1_gkg.query()
 
 from GNAF.news.database.gkg import *
 # GDELT GKG Database Version 2.0
-gdelt_events_v2_gkg = GKG_V2(start_date = "2021-01-01", end_date = "2021-01-02")
+gdelt_events_v2_gkg = GKG_V2(start_date = "2021-01-01-00-00-00", end_date = "2021-01-02-00-00-00")
 results_v2_gkg = gdelt_events_v2_gkg.query()
 ```
 
