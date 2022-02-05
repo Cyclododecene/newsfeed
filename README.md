@@ -1,14 +1,15 @@
-# GNAF
+# NewsFeed
 
-GNAF: GDELT News Aggregation and Feed
+
 
 ## Introduction
 
+Newsfeed based on GDELT Project
 
 ## HOWTO
 
 ```shell
-conda create -n GNAF python=3.7
+conda create -n newsfeed python=3.7
 python setup install
 ```
 
@@ -59,8 +60,8 @@ from newsfeed.news.apis.query import *
 
 f = Art_Filter(
     keyword = ["Exchange Rate", "World"],
-    start_date = "2021-12-31-00-00-00",
-    end_date = "2021-12-31-01-00-00",
+    start_date = "20211231000000",
+    end_date = "20211231010000",
     country = ["China", "US"]
 )
 
