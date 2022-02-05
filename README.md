@@ -9,3 +9,10 @@ Check [query](https://github.com/Cyclododecene/GNAF/blob/main/GNAF/news/README.m
 ## Proxy Pool
 
 Check [proxypool](https://github.com/Cyclododecene/GNAF/blob/main/code/proxypool/README.md)
+
+## HOWTO
+
+```shell
+conda create -n GNAF python=3.7
+python setup install
+```
