@@ -77,12 +77,7 @@ class Event_V1(object):
                                           sep="\t",
                                           header=None,
                                           warn_bad_lines=False,
-                                          low_memory=False,
-                                          dtype={
-                                              26: 'str',
-                                              27: 'str',
-                                              28: 'str'
-                                          })
+                                          low_memory=False)
                 #response_text.flush()
                 #response_text.close()
                 return response_df
@@ -205,12 +200,7 @@ class Event_V2(object):
                                           sep="\t",
                                           header=None,
                                           warn_bad_lines=False,
-                                          low_memory=False,
-                                          dtype={
-                                              26: 'str',
-                                              27: 'str',
-                                              28: 'str'
-                                          })
+                                          low_memory=False)
                 #response_text.flush()
                 #response_text.close()
                 return response_df
@@ -230,7 +220,8 @@ class Event_V2(object):
             pool.close()
             pool.terminate()
             pool.join()
-            results = pd.concat(downloaded_dfs)
+            results = [data for data in downloaded_dfs if type(data) == pd.DataFrame] # remove non DataFrame (e.g. Error)
+            results = pd.concat(results)
             del downloaded_dfs
             results.reset_index(drop=True, inplace=True)
             if self.table == "events":
