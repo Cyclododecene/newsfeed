@@ -13,7 +13,7 @@ setup(
     url="https://github.com/Cyclododecene/newsfeed",
     packages=find_packages(exclude=["test", "example"]),
     install_requires=[
-        'tqdm', 'pandas', 'lxml', 'fake-useragent'
+        'tqdm', 'pandas', 'lxml', 'fake-useragent','newspaper3k'
     ],
     license="MIT",
     classifiers=[
