@@ -2,16 +2,16 @@ from setuptools import setup, find_packages
 import os
 
 setup(
-    name="GNAF-backend",
-    version="0.0.1",
-    keywords="GDELT News Aggregation and Feed",
+    name="newsfeed",
+    version="0.1.0",
+    keywords="GDELT NewsFeed",
     long_description=open(os.path.join(os.path.dirname(__file__),
                                        'README.md')).read(),
     long_description_content_type='text/markdown',
-    author="TerenceCKLau",
+    author="Cyclododecene",
     author_email="terenceliu1012@outlook.com",
-    url="https://github.com/Cyclododecene/GNAF",
-    packages=find_packages(),
+    url="https://github.com/Cyclododecene/newsfeed",
+    packages=find_packages(exclude=["test", "example"]),
     install_requires=[
         'tqdm', 'pandas', 'lxml', 'fake-useragent'
     ],
