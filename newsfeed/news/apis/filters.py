@@ -2,8 +2,9 @@
 author: Terence Junjie LIU
 start_date: Mon 27 Dec, 2021
 
-The original code is from gdelt-doc-api:
-"https://github.com/alex9smith/gdelt-doc-api/blob/main/gdeltdoc/filters.py"
+The original code is from gdelt-doc-api (with MIT License):
+"https://github.com/alex9smith/gdelt-doc-api/blob/2a545fb1e113dbb7fd4de8fd4eab8f1f62817543/gdeltdoc/filters.py"
+
 difference between this and the original:
 1. remove the parameter: timespan, use start-date and end-date only
 2. start-date and end-date, we also consider the HH:MM:SS for more precise querying
