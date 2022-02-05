@@ -23,7 +23,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 class GKG_V1(object):
     base_url = "http://data.gdeltproject.org/gkg/"
-    cpu_num = multiprocessing.cpu_count() * 10
+    cpu_num = multiprocessing.cpu_count() * 2
 
     columns_name = [
         'DATE', 'NUMARTS', 'COUNTS', 'THEMES', 'LOCATIONS', 'PERSONS',
@@ -89,7 +89,7 @@ class GKG_V1(object):
         download_url_list = self._query_list()
         pool = multiprocessing.Pool(self.cpu_num)
         try:
-            print("[+] Downloading...")
+            print("[+] Downloading... [startdate={} & enddate={}]".format(self.start_date, self.end_date))
             downloaded_dfs = list(
                 tqdm.tqdm(pool.imap_unordered(self._download_file,
                                               download_url_list),
@@ -107,7 +107,7 @@ class GKG_V1(object):
 
 
 class GKG_V2(object):
-    cpu_num = multiprocessing.cpu_count() * 10
+    cpu_num = multiprocessing.cpu_count() * 2
 
     columns_name = [
         'GKGRECORDID', 'V2.1DATE', ' V2SOURCECOLLECTIONIDENTIFIER',
@@ -215,7 +215,7 @@ class GKG_V2(object):
         download_url_list = self._query_list()
         pool = multiprocessing.Pool(self.cpu_num)
         try:
-            print("[+] Downloading...")
+            print("[+] Downloading... [startdate={} & enddate={}]".format(self.start_date, self.end_date))
             downloaded_dfs = list(
                 tqdm.tqdm(pool.imap_unordered(self._download_file,
                                               download_url_list),

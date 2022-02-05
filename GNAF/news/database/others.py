@@ -22,7 +22,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
 class GEG(object):
-    cpu_num = multiprocessing.cpu_count() * 10
+    cpu_num = multiprocessing.cpu_count() * 20
     columns_name = [
         'date', 'url', 'lang', 'polarity', 'magnitude', 'score', 'entities'
     ]
@@ -91,7 +91,7 @@ class GEG(object):
         download_url_list = self._query_list()
         pool = multiprocessing.Pool(self.cpu_num)
         try:
-            print("[+] Downloading...")
+            print("[+] Downloading... [startdate={} & enddate={}]".format(self.start_date, self.end_date))
             downloaded_dfs = list(
                 tqdm.tqdm(pool.imap_unordered(self._download_file,
                                               download_url_list),
@@ -129,7 +129,7 @@ class VGEG(object):
         self.domain = domain
         self.raw = raw
         self.proxy = proxy
-        self.cpu_num = multiprocessing.cpu_count() * 10
+        self.cpu_num = multiprocessing.cpu_count() * 20
 
     def _generate_header(self):
         ua = UserAgent(verify_ssl=False)
@@ -203,7 +203,7 @@ class VGEG(object):
         download_url_list = self._query_list()
         pool = multiprocessing.Pool(self.cpu_num)
         try:
-            print("[+] Downloading...")
+            print("[+] Downloading... [startdate={} & enddate={}]".format(self.start_date, self.end_date))
             downloaded_dfs = list(
                 tqdm.tqdm(pool.imap_unordered(self._download_file,
                                               download_url_list),

@@ -1,16 +1,13 @@
 """
 author: Terence Junjie LIU
 start_date: Mon 27 Dec, 2021
+modified: Sat 05 Jan, 2022
 """
-
-import io
 from multiprocessing.sharedctypes import Value
-import os
-import re
 import time
 import tqdm
-import datetime
 import requests
+import datetime
 import pandas as pd
 from lxml import html
 import multiprocessing
@@ -23,7 +20,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 class Event_V1(object):
     base_url = "http://data.gdeltproject.org/events/"
-    cpu_num = multiprocessing.cpu_count() * 10
+    cpu_num = multiprocessing.cpu_count() * 2
 
     columns_name = [
         'GLOBALEVENTID', 'SQLDATE', 'MonthYear', 'Year', 'FractionDate',
@@ -73,7 +70,8 @@ class Event_V1(object):
 
         return download_url_list
 
-    def _download_file(self, url: str = "20200101.export.CSV.zip"):
+    # tp = pd.read_csv('Check1_900.csv', sep='\t', iterator=True, chunksize=1000)
+    def _download_file(self, url:str="20200101.export.CSV.zip"):
         download_url = self.base_url + url
         time.sleep(0.0005)
         try:
@@ -85,8 +83,8 @@ class Event_V1(object):
                 return "GDELT does not contains this url: {}".format(url)
 
             else:
-                response_text = io.BytesIO(response.content)
-                response_df = pd.read_csv(response_text,
+                #response_text = io.BytesIO(response.content)
+                response_df = pd.read_csv(download_url,
                                           compression="zip",
                                           sep="\t",
                                           header=None,
@@ -97,8 +95,8 @@ class Event_V1(object):
                                               27: 'str',
                                               28: 'str'
                                           })
-                response_text.flush()
-                response_text.close()
+                #response_text.flush()
+                #response_text.close()
                 return response_df
 
         except Exception as e:
@@ -108,7 +106,7 @@ class Event_V1(object):
         download_url_list = self._query_list()
         pool = multiprocessing.Pool(self.cpu_num)
         try:
-            print("[+] Downloading...")
+            print("[+] Downloading... [startdate={} & enddate={}]".format(self.start_date, self.end_date))
             downloaded_dfs = list(
                 tqdm.tqdm(pool.imap_unordered(self._download_file,
                                               download_url_list),
@@ -126,7 +124,7 @@ class Event_V1(object):
 
 
 class Event_V2(object):
-    cpu_num = multiprocessing.cpu_count() * 10
+    cpu_num = multiprocessing.cpu_count() * 2
 
     columns_name_events = [
         'GLOBALEVENTID', 'SQLDATE', 'MonthYear', 'Year', 'FractionDate',
@@ -158,13 +156,13 @@ class Event_V2(object):
     ]
 
     def __init__(self,
-                 start_date: str = "2020-01-01",
-                 end_date: str = "2021-12-31",
+                 start_date: str = "2020-01-01-00-00-00",
+                 end_date: str = "2021-12-31-00-00-00",
                  table: str = "events",
                  translation: bool = False,
                  proxy: dict = None):
-        self.start_date = "".join(start_date.split("-")) + "000000"
-        self.end_date = "".join(end_date.split("-")) + "000000"
+        self.start_date = "".join(start_date.split("-"))
+        self.end_date = "".join(end_date.split("-"))
         self.table = table
         self.translation = translation
         self.proxy = proxy
@@ -216,7 +214,6 @@ class Event_V2(object):
                 page = pd.read_csv(
                     "http://data.gdeltproject.org/gdeltv2/masterfilelist.txt",
                     sep=" ",
-                    engine="c",
                     na_filter=False,
                     low_memory=False,
                     names=["a", "b", "url"])
@@ -252,8 +249,8 @@ class Event_V2(object):
                 return "GDELT does not contains this url: {}".format(url)
 
             else:
-                response_text = io.BytesIO(response.content)
-                response_df = pd.read_csv(response_text,
+                #response_text = io.BytesIO(response.content)
+                response_df = pd.read_csv(download_url,
                                           compression="zip",
                                           sep="\t",
                                           header=None,
@@ -264,8 +261,8 @@ class Event_V2(object):
                                               27: 'str',
                                               28: 'str'
                                           })
-                response_text.flush()
-                response_text.close()
+                #response_text.flush()
+                #response_text.close()
                 return response_df
 
         except Exception as e:
@@ -275,7 +272,7 @@ class Event_V2(object):
         download_url_list = self._query_list()
         pool = multiprocessing.Pool(self.cpu_num)
         try:
-            print("[+] Downloading...")
+            print("[+] Downloading... [startdate={} & enddate={}]".format(self.start_date, self.end_date))
             downloaded_dfs = list(
                 tqdm.tqdm(pool.imap_unordered(self._download_file,
                                               download_url_list),
