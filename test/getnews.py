@@ -114,3 +114,26 @@ def download_news(url):
 result = []
 for i in tqdm.tqdm(range(0, 20)):
     result.append(download_news(articles_e.loc[i, 'url']))
+
+
+import gdelt
+from GNAF.news.database.events import *
+import time
+# Version 1 queries
+gd1 = gdelt.gdelt(version=2)
+start = time.time()
+# pull events table, range, output to json format
+results = gd1.Search(['2021 Jan 1','2021 Jan 2'],coverage=True,table='events')
+time1 = (time.time()-start)
+
+
+from GNAF.news.database.events import *
+import time
+gdelt_events_v1_events = Event_V2(start_date = "2021-01-01", end_date = "2021-01-10")
+start = time.time()
+results_v1_events = gdelt_events_v1_events.query()
+time2 = (time.time()-start)
+
+
+
+

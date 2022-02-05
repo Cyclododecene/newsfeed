@@ -9,6 +9,7 @@ import requests
 import pandas as pd
 from lxml import html
 import multiprocessing
+from datetime import datetime
 from fake_useragent import UserAgent
 
 import warnings
@@ -54,18 +55,7 @@ class Event_V1(object):
         return header
 
     def _query_list(self) -> list:
-        print("[+] Scraping data from GDELT Project...")
-        page = requests.get("http://data.gdeltproject.org/events/index.html",
-                            headers=self._generate_header(),
-                            proxies=self.proxy)
-        webpage = html.fromstring(page.content)
-        url_list = webpage.xpath("//a/@href")
-        #url_list = [item for item in url_list if len(item) == 23] report other url
-        download_url_list = list(
-            filter(
-                lambda x: x[0:8] >= self.start_date and x[0:8] < self.end_date,
-                url_list))
-
+        download_url_list = [datetime.strftime(i, "%Y%m%d") + ".export.CSV.zip" for i in pd.date_range(self.start_date, self.end_date, freq="D")]
         return download_url_list
 
     # tp = pd.read_csv('Check1_900.csv', sep='\t', iterator=True, chunksize=1000)
@@ -123,6 +113,7 @@ class Event_V1(object):
 
 class Event_V2(object):
     cpu_num = multiprocessing.cpu_count() * 2
+    base_url = "http://data.gdeltproject.org/gdeltv2/"
 
     columns_name_events = [
         'GLOBALEVENTID', 'SQLDATE', 'MonthYear', 'Year', 'FractionDate',
@@ -180,63 +171,24 @@ class Event_V2(object):
         else:
             if self.translation == True:
                 print("[+] Scraping data from GDELT Project...")
-                page = pd.read_csv(
-                    "http://data.gdeltproject.org/gdeltv2/masterfilelist-translation.txt",
-                    sep=" ",
-                    engine="c",
-                    na_filter=False,
-                    low_memory=False,
-                    names=["a", "b", "url"])
-
                 if self.table == "events":
-                    url_list = list(
-                        page[page["url"].str.contains("export")]["url"])
-                    del page
-                    download_url_list = list(
-                        filter(
-                            lambda x: x[37:51] >= self.start_date and x[37:51]
-                            < self.end_date, url_list))
+                    download_url_list = [datetime.strftime(i, "%Y%m%d%H%M%S") + ".translation.export.CSV.zip" for i in pd.date_range(self.start_date, self.end_date, freq="15min")]
                     return download_url_list
-                else:
-                    url_list = list(
-                        page[page["url"].str.contains("mentions")]["url"])
-                    del page
-                    download_url_list = list(
-                        filter(
-                            lambda x: x[37:51] >= self.start_date and x[37:51]
-                            < self.end_date, url_list))
+                elif self.table == "mentions":
+                    download_url_list = [datetime.strftime(i, "%Y%m%d%H%M%S") + ".translation.mentions.CSV.zip" for i in pd.date_range(self.start_date, self.end_date, freq="15min")]
                     return download_url_list
 
             else:
                 print("[+] Scraping data from GDELT Project...")
-                page = pd.read_csv(
-                    "http://data.gdeltproject.org/gdeltv2/masterfilelist.txt",
-                    sep=" ",
-                    na_filter=False,
-                    low_memory=False,
-                    names=["a", "b", "url"])
-
                 if self.table == "events":
-                    url_list = list(
-                        page[page["url"].str.contains("export")]["url"])
-                    del page
-                    download_url_list = list(
-                        filter(
-                            lambda x: x[37:51] >= self.start_date and x[37:51]
-                            < self.end_date, url_list))
+                    download_url_list = [datetime.strftime(i, "%Y%m%d%H%M%S") + ".export.CSV.zip" for i in pd.date_range(self.start_date, self.end_date, freq="15min")]
                     return download_url_list
-                else:
-                    url_list = list(
-                        page[page["url"].str.contains("mentions")]["url"])
-                    del page
-                    download_url_list = list(
-                        filter(
-                            lambda x: x[37:51] >= self.start_date and x[37:51]
-                            < self.end_date, url_list))
+                elif self.table == "mentions":
+                    download_url_list = [datetime.strftime(i, "%Y%m%d%H%M%S") + ".mentions.CSV.zip" for i in pd.date_range(self.start_date, self.end_date, freq="15min")]
                     return download_url_list
 
     def _download_file(self, url: str = "20220108160000.export.CSV.zip"):
-        download_url = url
+        download_url = self.base_url + url
         time.sleep(0.0005)
         try:
             response = requests.get(download_url,
