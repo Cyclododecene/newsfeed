@@ -302,6 +302,7 @@ class Event_V2(object):
                              (dt.minute // 15)),
                     "%Y%m%d%H%M%S") + ".mentions.CSV.zip"
 
+        print("[+] Downloading... date:{}".format(datetime.strftime(dt, "%Y-%m-%d %H:%M:%S")))
         results = self._download_file(url=url)
         results.reset_index(drop=True, inplace=True)
         if self.table == "events":
