@@ -118,10 +118,11 @@ class Event_V1(object):
             dt = datetime.strptime(date, "%Y-%m-%d")
 
         url = datetime.strftime(dt, "%Y%m%d") + ".export.CSV.zip"
+        print("[+] Downloading... date:{}".format(datetime.strftime(dt, "%Y-%m-%d")))
         results = self._download_file(url=url)
-        results.reset_index(drop=True, inplace=True)
-        results.columns = self.columns_name
-        return results
+        if type(results) == "str":
+            print(results)
+            return None
 
 
 class Event_V2(object):

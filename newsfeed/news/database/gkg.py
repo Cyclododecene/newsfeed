@@ -10,7 +10,7 @@ import requests
 import pandas as pd
 from lxml import html
 import multiprocessing
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from fake_useragent import UserAgent
 
 import warnings
@@ -49,13 +49,13 @@ class GKG_V1(object):
         url_list = webpage.xpath("//a/@href")
         #url_list = [item for item in url_list if len(item) == 23] report other url
         download_url_list = [
-            self.base_url + datetime.strftime(i, "%Y%m%d") + ".gkg.csv.zip"
+            datetime.strftime(i, "%Y%m%d") + ".gkg.csv.zip"
             for i in pd.date_range(self.start_date, self.end_date, freq="D")
         ]
         return download_url_list
 
     def _download_file(self, url: str = "20200101.gkg.csv.zip"):
-        download_url = url
+        download_url = self.base_url + url
         time.sleep(0.0005)
         try:
             response = requests.get(download_url,
@@ -101,19 +101,38 @@ class GKG_V1(object):
         except Exception as e:
             return e
 
+    def query_nowtime(self, date: str = None):
+        # by default the self.start_date variable is None, then the func will query for the nearest files
+        # if self.start_date is valued, then the func will query the given datetime
+        if date == None:
+            dt = datetime.now(timezone.utc) - timedelta(days=1)
+        else:
+            dt = datetime.strptime(date, "%Y-%m-%d")
+
+        url = datetime.strftime(dt, "%Y%m%d") + ".gkg.csv.zip"
+        print("[+] Downloading... date:{}".format(datetime.strftime(dt, "%Y-%m-%d")))
+        results = self._download_file(url=url)
+        if type(results) == "str":
+            print(results)
+            return None
+        else:
+            results.reset_index(drop=True, inplace=True)
+            results.columns = self.columns_name
+            return results
+
 
 class GKG_V2(object):
     cpu_num = multiprocessing.cpu_count() * 2
     base_url = "http://data.gdeltproject.org/gdeltv2/"
     columns_name = [
         'GKGRECORDID', 'V2.1DATE', 'V2SOURCECOLLECTIONIDENTIFIER',
-        'V2SOURCECOMMONNAME', 'V2DOCUMENTIDENTIFIER', 'V1COUNTS',
-        'V2COUNTS', 'V1THEMES', 'V2ENHANCEDTHEMES', 'V1LOCATIONS',
-        'V2ENHANCEDLOCATIONS', 'V1PERSONS', 'V2ENHANCEDPERSONS',
-        'V1ORGANIZATIONS', ' V2ENHANCEDORGANIZATIONS', 'V1TONE',
-        'V2ENHANCEDDATES', 'V2GCAM', 'V2SHARINGIMAGE', 'V2RELATEDIMAGES',
-        'V2SOCIALIMAGEEMBEDS', 'V2SOCIALVIDEOEMBEDS', 'V2QUOTATIONS',
-        'V2ALLNAMES', 'V2AMOUNTS', 'V2TRANSLATIONINFO', 'V2EXTRASXML'
+        'V2SOURCECOMMONNAME', 'V2DOCUMENTIDENTIFIER', 'V1COUNTS', 'V2COUNTS',
+        'V1THEMES', 'V2ENHANCEDTHEMES', 'V1LOCATIONS', 'V2ENHANCEDLOCATIONS',
+        'V1PERSONS', 'V2ENHANCEDPERSONS', 'V1ORGANIZATIONS',
+        ' V2ENHANCEDORGANIZATIONS', 'V1TONE', 'V2ENHANCEDDATES', 'V2GCAM',
+        'V2SHARINGIMAGE', 'V2RELATEDIMAGES', 'V2SOCIALIMAGEEMBEDS',
+        'V2SOCIALVIDEOEMBEDS', 'V2QUOTATIONS', 'V2ALLNAMES', 'V2AMOUNTS',
+        'V2TRANSLATIONINFO', 'V2EXTRASXML'
     ]
 
     def __init__(self,
@@ -136,7 +155,7 @@ class GKG_V2(object):
         if self.translation == True:
             print("[+] Scraping data from GDELT Project...")
             download_url_list = [
-                self.base_url + datetime.strftime(i, "%Y%m%d%H%M%S") +
+                datetime.strftime(i, "%Y%m%d%H%M%S") +
                 ".translation.gkg.csv.zip" for i in pd.date_range(
                     self.start_date, self.end_date, freq="15min")
             ]
@@ -145,14 +164,14 @@ class GKG_V2(object):
         else:
             print("[+] Scraping data from GDELT Project...")
             download_url_list = [
-                self.base_url + datetime.strftime(i, "%Y%m%d%H%M%S") +
+                datetime.strftime(i, "%Y%m%d%H%M%S") +
                 ".gkg.csv.zip" for i in pd.date_range(
                     self.start_date, self.end_date, freq="15min")
             ]
             return download_url_list
 
     def _download_file(self, url: str = None):
-        download_url = url
+        download_url = self.base_url + url
         time.sleep(0.001)
         try:
             response = requests.get(download_url,
@@ -208,6 +227,29 @@ class GKG_V2(object):
         except Exception as e:
             return e
 
+    def query_nowtime(self, date:str=None):
+        # by default the self.start_date variable is None, then the func will query for the nearest files
+        # if self.start_date is valued, then the func will query the given datetime
+        if date == None:
+            dt = datetime.now(timezone.utc)
+        else:
+            dt = datetime.strptime(date, "%Y-%m-%d-%H-%M-%S")
+
+        if self.translation:
+            url = datetime.strftime(
+                datetime(dt.year, dt.month, dt.day, dt.hour, 15 *
+                            (dt.minute // 15)),
+                "%Y%m%d%H%M%S") + ".translation.gkg.csv.zip"
+        else:
+            url = datetime.strftime(
+                datetime(dt.year, dt.month, dt.day, dt.hour, 15 *
+                            (dt.minute // 15)),
+                "%Y%m%d%H%M%S") + ".gkg.csv.zip"
+
+        results = self._download_file(url=url)
+        results.reset_index(drop=True, inplace=True)
+        results.columns = self.columns_name
+        return results
 
 
 if __name__ == "__main__":
