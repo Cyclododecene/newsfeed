@@ -46,8 +46,8 @@ The URL encoding reference: [url encode](https://www.eso.org/~ndelmott/url_encod
 ### GDELT Others
 - [x] [GDELT Global Entity Graph](https://blog.gdeltproject.org/announcing-the-global-entity-graph-geg-and-a-new-11-billion-entity-dataset/)
 - [x] [GDELT Visual Global Entity Graph](https://blog.gdeltproject.org/what-googles-cloud-video-ai-sees-watching-decade-of-television-news-the-visual-global-entity-graph-2-0/)
-- [ ] [GDELT Different Graph](https://blog.gdeltproject.org/announcing-the-gdelt-global-difference-graph-gdg-planetary-scale-change-detection-for-the-global-news-media/)  
-- [ ] [GDELT Global Frontpage Graph](https://blog.gdeltproject.org/announcing-gdelt-global-frontpage-graph-gfg/)
+- [x] [GDELT Different Graph](https://blog.gdeltproject.org/announcing-the-gdelt-global-difference-graph-gdg-planetary-scale-change-detection-for-the-global-news-media/)  
+- [x] [GDELT Global Frontpage Graph](https://blog.gdeltproject.org/announcing-gdelt-global-frontpage-graph-gfg/)
 
 ## HOWTO
 
@@ -125,7 +125,7 @@ gdelt_events_v2_gkg = GKG_V2(start_date = "2021-01-01-00-00-00", end_date = "202
 results_v2_gkg = gdelt_events_v2_gkg.query()
 ```
 
-For GEG and VGEG:
+For GEG, VGEG and GDG:
 
 ```python
 from newsfeed.news.database.others import *
@@ -136,6 +136,10 @@ gdelt_v3_geg_result = gdelt_v3_geg.query()
 # GDELT Visual Global Entity Graph
 gdelt_v3_vgeg = VGEG(query_date = "2020-01-01", domain = "CNN")
 gdelt_v3_vgeg_result = gdelt_v3_vgeg.query() 
+
+# GDELT Global Difference Graph
+gdelt_v3_gdg = GDG(query_date="2018-08-27-14-00-00")
+gdelt_v3_gdg_result = gdelt_v3_gdg.query()
 ```
 
 ### Utils

@@ -2,13 +2,15 @@
 author: Terence Junjie LIU
 start_date: Mon 27 Dec, 2021
 """
-
+import re
 import io
+from multiprocessing.sharedctypes import Value
 import time
 import tqdm
 import requests
 import pandas as pd
 import multiprocessing
+from datetime import datetime, timedelta
 from fake_useragent import UserAgent
 
 import warnings
@@ -86,7 +88,8 @@ class GEG(object):
         download_url_list = self._query_list()
         pool = multiprocessing.Pool(self.cpu_num)
         try:
-            print("[+] Downloading... [startdate={} & enddate={}]".format(self.start_date, self.end_date))
+            print("[+] Downloading... [startdate={} & enddate={}]".format(
+                self.start_date, self.end_date))
             downloaded_dfs = list(
                 tqdm.tqdm(pool.imap_unordered(self._download_file,
                                               download_url_list),
@@ -198,7 +201,8 @@ class VGEG(object):
         download_url_list = self._query_list()
         pool = multiprocessing.Pool(self.cpu_num)
         try:
-            print("[+] Downloading... [startdate={} & enddate={}]".format(self.start_date, self.end_date))
+            print("[+] Downloading... [startdate={} & enddate={}]".format(
+                self.start_date, self.end_date))
             downloaded_dfs = list(
                 tqdm.tqdm(pool.imap_unordered(self._download_file,
                                               download_url_list),
@@ -218,6 +222,82 @@ class VGEG(object):
             return e
 
 
+class GDG(object):
+
+    base_url = "http://data.gdeltproject.org/gdeltv3/gdg/"
+
+    def __init__(self,
+                 query_date: str = "2018-07-27-14-00-00",
+                 proxy: dict = None):
+        self.query_date = "".join(query_date.split("-"))
+        self.proxy = proxy
+
+    def _generate_header(self):
+        ua = UserAgent(verify_ssl=False)
+        header = {"User-Agent": str(ua.random)}
+        return header
+
+    def query(self):
+        url = self.base_url + datetime.strftime(
+            datetime.strptime(self.query_date, "%Y%m%d%H%M%S") +
+            timedelta(minutes=1), "%Y%m%d%H%M%S") + ".gdg.v3.json.gz"
+        response = requests.get(url,
+                                headers=self._generate_header(),
+                                proxies=self.proxy)
+        if response.ok:
+            response = io.BytesIO(response.content)
+            result = pd.read_json(response, compression="gzip", lines=True)
+            return result
+        else:
+            return ValueError(
+                "GDELT does not contains GDG data of date: {}".format(
+                    self.query_date))
+
+
+class GFG(object):
+
+    base_url = "http://data.gdeltproject.org/gdeltv3/gfg/alpha/"
+
+    def __init__(self,
+                 query_date: str = "2018-07-27-14-00-00",
+                 proxy: dict = None):
+        self.query_date = "".join(query_date.split("-"))
+        self.proxy = proxy
+        self.latest_date()
+
+    def _generate_header(self):
+        ua = UserAgent(verify_ssl=False)
+        header = {"User-Agent": str(ua.random)}
+        return header
+
+    def latest_date(self):
+        url = self.base_url + "lastupdate.txt"
+        latest_url = list(
+            pd.read_csv(url, sep=" ", names=["a", "b", "url"])["url"])[0]
+        reg = re.compile("\d{14}")
+        date = reg.findall(latest_url)[0]
+        print("The latest file is: {}".format(
+            datetime.strftime(datetime.strptime(date, "%Y%m%d%H%M%S"),
+                              "%Y-%m-%d-%H-%M-%S")))
+
+    def query(self):
+        url = self.base_url + self.query_date + ".LINKS.TXT.gz"
+        response = requests.get(url,
+                                headers=self._generate_header(),
+                                proxies=self.proxy)
+        if response.ok:
+            print("[+] Loading...")
+            result = pd.read_csv(url,
+                                  compression="gzip",
+                                  sep="  ",
+                                  on_bad_lines="skip")
+            return result
+        else:
+            return ValueError(
+                "GDELT does not contains GFG data of date: {}".format(
+                    self.query_date))
+
+
 if __name__ == "__main__":
     # GDELT Global Entity Graph
     gdelt_v3_geg = GEG(start_date="2020-01-01", end_date="2020-01-02")
@@ -226,3 +306,9 @@ if __name__ == "__main__":
     # GDELT Visual Global Entity Graph
     gdelt_v3_vgeg = VGEG(query_date="2020-01-01", domain="CNN")
     gdelt_v3_vgeg_result = gdelt_v3_vgeg.query()
+
+    # GDELT Glocal Difference Graph
+    gdelt_v3_gdg = GDG(query_date="2018-08-27-14-00-00")
+    gdelt_v3_gdg_result = gdelt_v3_gdg.query()
+    gdelt_v3_gfg = GFG(query_date="2018-03-02-02-00-00")
+    gdelt_v3_gfg_result = gdelt_v3_gfg.query()

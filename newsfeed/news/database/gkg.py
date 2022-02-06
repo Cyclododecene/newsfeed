@@ -209,22 +209,6 @@ class GKG_V2(object):
             return e
 
 
-"""
-### test ###
-page = pd.read_csv("http://data.gdeltproject.org/gdeltv2/masterfilelist-translation.txt", sep = " ", engine = "c", na_filter = False, 
-                                low_memory = False, names = ["a", "b", "url"])
-url_list = list(page[page["url"].str.contains("gkg")]["url"])
-download_url_list = list(filter(lambda x: x[37:51] >= "20210101000000" and x[37:51] < "20210102000000", url_list))
-result = []
-for i in tqdm.tqdm(range(0, len(download_url_list))):
-    response = requests.get(download_url_list[i], timeout = 10, stream = True)
-    response_text = io.BytesIO(response.content)
-    try:
-        response_df = pd.read_csv(response_text, compression="zip", sep = "\t", header = None, low_memory=False, encoding = "utf-8")
-    except UnicodeDecodeError:
-        response_df = pd.read_csv(response_text, compression="zip", sep = "\t", header = None, low_memory=False, encoding = "latin-1")
-    result.append(response_df)
-"""
 
 if __name__ == "__main__":
 
