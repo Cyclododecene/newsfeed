@@ -98,15 +98,15 @@ For event database (both V1 and V2):
 ```python
 from newsfeed.news.database.events import *
 # GDELT Event Database Version 1.0
-gdelt_events_v1_events = Event_V1(start_date = "2021-01-01", end_date = "2021-01-02")
+gdelt_events_v1_events = EventV1(start_date = "2021-01-01", end_date = "2021-01-02")
 results_v1_events = gdelt_events_v1_events.query()
 
 # GDELT Event Database Version 2.0 - Event
-gdelt_events_v2_events = Event_V2(start_date = "2021-01-01-00-00-00", end_date = "2021-01-02-00-00-00")
+gdelt_events_v2_events = EventV2(start_date = "2021-01-01-00-00-00", end_date = "2021-01-02-00-00-00")
 results_v2_events = gdelt_events_v2_events.query()
 
 # GDELT Event Database Version 2.0 - Mentions
-gdelt_events_v2_mentions = Event_V2(start_date = "2021-01-01-00-00-00", end_date = "2021-01-02-00-00-00", table = "mentions")
+gdelt_events_v2_mentions = EventV2(start_date = "2021-01-01-00-00-00", end_date = "2021-01-02-00-00-00", table = "mentions")
 results_v2_mentions = gdelt_events_v2_mentions.query()
 
 ```
@@ -116,12 +116,12 @@ For GKG databse (both V1 and V2):
 ```python
 from newsfeed.news.database.gkg import *
 # GDELT GKG Database Version 1.0
-gdelt_events_v1_gkg = GKG_V1(start_date = "2021-01-01", end_date = "2021-01-02")
+gdelt_events_v1_gkg = GKGV1(start_date = "2021-01-01", end_date = "2021-01-02")
 results_v1_gkg = gdelt_events_v1_gkg.query()
 
 from newsfeed.news.database.gkg import *
 # GDELT GKG Database Version 2.0
-gdelt_events_v2_gkg = GKG_V2(start_date = "2021-01-01-00-00-00", end_date = "2021-01-02-00-00-00")
+gdelt_events_v2_gkg = GKGV2(start_date = "2021-01-01-00-00-00", end_date = "2021-01-02-00-00-00")
 results_v2_gkg = gdelt_events_v2_gkg.query()
 ```
 

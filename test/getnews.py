@@ -1,11 +1,11 @@
 from newsfeed.news.database.events import *
 from newsfeed.utils import fulltext as ft
 
-events = Event_V2(start_date="2022-02-06-00-00-00", end_date="2022-02-06-12-00-00")
+events = EventV2(start_date="2022-02-06-00-00-00", end_date="2022-02-06-12-00-00")
 events_list = events.query_nowtime()
 
 
-mentions = Event_V2(start_date="2022-02-06-00-00-00", end_date="2022-02-06-12-00-00", table="mentions")
+mentions = EventV2(start_date="2022-02-06-00-00-00", end_date="2022-02-06-12-00-00", table="mentions")
 mentions_list = mentions.query_nowtime()
 
 intersection_list = list(set(mentions_list["GLOBALEVENTID"]).intersection(set(events_list["GLOBALEVENTID"])))

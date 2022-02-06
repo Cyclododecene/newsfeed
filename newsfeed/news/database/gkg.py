@@ -18,7 +18,7 @@ import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
-class GKG_V1(object):
+class GKGV1(object):
     base_url = "http://data.gdeltproject.org/gkg/"
     cpu_num = multiprocessing.cpu_count() * 2
 
@@ -122,7 +122,7 @@ class GKG_V1(object):
             return results
 
 
-class GKG_V2(object):
+class GKGV2(object):
     cpu_num = multiprocessing.cpu_count() * 2
     base_url = "http://data.gdeltproject.org/gdeltv2/"
     columns_name = [
@@ -256,12 +256,12 @@ class GKG_V2(object):
 if __name__ == "__main__":
 
     # GDELT GKG Database Version 1.0
-    gdelt_events_v1_gkg = GKG_V1(start_date="2021-01-01",
+    gdelt_events_v1_gkg = GKGV1(start_date="2021-01-01",
                                  end_date="2021-01-02")
     results_v1_gkg = gdelt_events_v1_gkg.query()
 
     # GDELT GKG Database Version 2.0
-    gdelt_events_v2_gkg = GKG_V2(start_date="2021-01-01",
+    gdelt_events_v2_gkg = GKGV2(start_date="2021-01-01",
                                  end_date="2021-01-02",
                                  translation=False)
     results_v2_gkg = gdelt_events_v2_gkg.query()

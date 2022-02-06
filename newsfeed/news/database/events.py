@@ -17,7 +17,7 @@ import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
-class Event_V1(object):
+class EventV1(object):
     base_url = "http://data.gdeltproject.org/events/"
     cpu_num = multiprocessing.cpu_count() * 2
 
@@ -126,7 +126,7 @@ class Event_V1(object):
             return None
 
 
-class Event_V2(object):
+class EventV2(object):
     cpu_num = multiprocessing.cpu_count() * 2
     base_url = "http://data.gdeltproject.org/gdeltv2/"
 
@@ -180,7 +180,7 @@ class Event_V2(object):
 
         if self.table != "events" and self.table != "mentions":
             return ValueError(
-                "Wrong table name, Event_V2 is only used for querying Event and Mentions"
+                "Wrong table name, EventV2 is only used for querying Event and Mentions"
             )
 
         else:
@@ -318,17 +318,17 @@ class Event_V2(object):
 if __name__ == "__main__":
 
     # GDELT Event Database Version 1.0
-    gdelt_events_v1_events = Event_V1(start_date="2021-01-01",
+    gdelt_events_v1_events = EventV1(start_date="2021-01-01",
                                       end_date="2021-01-02")
     results_v1_events = gdelt_events_v1_events.query()
 
     # GDELT Event Database Version 2.0 - Event
-    gdelt_events_v2_events = Event_V2(start_date="2021-01-01",
+    gdelt_events_v2_events = EventV2(start_date="2021-01-01",
                                       end_date="2021-01-02")
     results_v2_events = gdelt_events_v2_events.query()
 
     # GDELT Event Database Version 2.0 - Mentions
-    gdelt_events_v2_mentions = Event_V2(start_date="2021-01-01",
+    gdelt_events_v2_mentions = EventV2(start_date="2021-01-01",
                                         end_date="2021-01-02",
                                         table="mentions")
     results_v2_mentions = gdelt_events_v2_mentions.query()
