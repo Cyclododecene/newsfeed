@@ -25,8 +25,8 @@ The URL encoding reference: [url encode](https://www.eso.org/~ndelmott/url_encod
 
 
  - [x] [GDELT DOC 2.0 API](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/)
- - [x] [GDELT GEO 2.0 API](https://blog.gdeltproject.org/gdelt-geo-2-0-api-debuts)
- - [ ] [GDELT TV 2.0 API](https://blog.gdeltproject.org/gdelt-2-0-television-api-debuts/)
+ - [x] [GDELT GEO 2.0 API](https://blog.gdeltproject.org/gdelt-geo-2-0-api-debuts) # BETA VERSION
+ - [ ] [GDELT TV 2.0 API](https://blog.gdeltproject.org/gdelt-2-0-television-api-debuts/) # NOT YET
 
 
 ## GDELT Database Query
@@ -113,14 +113,17 @@ from newsfeed.news.database.events import *
 # GDELT Event Database Version 1.0
 gdelt_events_v1_events = EventV1(start_date = "2021-01-01", end_date = "2021-01-02")
 results_v1_events = gdelt_events_v1_events.query()
+results_v1_events_nowtime = gdelt_events_v1_events.query_nowtime()
 
 # GDELT Event Database Version 2.0 - Event
 gdelt_events_v2_events = EventV2(start_date = "2021-01-01-00-00-00", end_date = "2021-01-02-00-00-00")
 results_v2_events = gdelt_events_v2_events.query()
+results_v2_events_nowtime = gdelt_events_v2_events.query_nowtime()
 
 # GDELT Event Database Version 2.0 - Mentions
 gdelt_events_v2_mentions = EventV2(start_date = "2021-01-01-00-00-00", end_date = "2021-01-02-00-00-00", table = "mentions")
 results_v2_mentions = gdelt_events_v2_mentions.query()
+results_v2_mentions_nowtime = gdelt_events_v2_mentions.query_nowtime()
 
 ```
 
@@ -131,11 +134,13 @@ from newsfeed.news.database.gkg import *
 # GDELT GKG Database Version 1.0
 gdelt_events_v1_gkg = GKGV1(start_date = "2021-01-01", end_date = "2021-01-02")
 results_v1_gkg = gdelt_events_v1_gkg.query()
+results_v1_gkg_nowtime = gdelt_events_v1_gkg.query_nowtime()
 
 from newsfeed.news.database.gkg import *
 # GDELT GKG Database Version 2.0
 gdelt_events_v2_gkg = GKGV2(start_date = "2021-01-01-00-00-00", end_date = "2021-01-02-00-00-00")
 results_v2_gkg = gdelt_events_v2_gkg.query()
+results_v2_gkg_nowtime = gdelt_events_v2_gkg.query_nowtime()
 ```
 
 For GEG, VGEG and GDG:
