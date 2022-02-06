@@ -42,6 +42,7 @@ class Art_Filter:
 
     def __init__(
         self,
+        timespan: Optional[int] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         num_records: int = 250,

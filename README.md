@@ -25,10 +25,9 @@ The URL encoding reference: [url encode](https://www.eso.org/~ndelmott/url_encod
 
 
  - [x] [GDELT DOC 2.0 API](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/)
- - [ ] [GDELT GEO 2.0 API](https://blog.gdeltproject.org/gdelt-geo-2-0-api-debuts)
+ - [x] [GDELT GEO 2.0 API](https://blog.gdeltproject.org/gdelt-geo-2-0-api-debuts)
  - [ ] [GDELT TV 2.0 API](https://blog.gdeltproject.org/gdelt-2-0-television-api-debuts/)
-  
-*NOTICE: DOC 2.0, GEO 2.0 and TV API can be found in [gdelt.github.io](https://gdelt.github.io/)*
+
 
 ## GDELT Database Query
 
@@ -69,6 +68,7 @@ f = Art_Filter(
 articles_30 = article_search(query_filter = f, max_recursion_depth = 100, time_range = 30)
 articles_60 = article_search(query_filter = f, max_recursion_depth = 100, time_range = 60)
 ```
+
 #### For Timeline query:
 
 ```python
@@ -82,6 +82,19 @@ f = Art_Filter(
     country = ["China", "US"]
 )
 timelineraw = timeline_search(query_filter = f, max_recursion_depth = 100, query_mode = "timelinevolraw")
+```
+
+#### For GEO query:
+
+```python
+from newsfeed.news.apis.filters import * 
+from newsfeed.news.apis.query import * 
+
+f = Art_Filter(
+    keyword = ["Exchange Rate", "World"],
+    country = ["China", "US"]
+)
+timelineraw = geo_search(query_filter = f, sourcelang="english", timespan=7)
 ```
 
 query_mode:

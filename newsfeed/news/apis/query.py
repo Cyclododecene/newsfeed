@@ -25,7 +25,6 @@ with start_date and end_date in filters, we split one day into two 12 hours:
 --------------------  ------------------           
 ...
 """
-from functools import partial
 import re
 import json
 import tqdm
@@ -92,12 +91,35 @@ def doc_query_search(query_string=None,
         else:
             if mode == "artlist":
                 pattern = re.compile('\d{14}')
-                output = pd.DataFrame(load_json(response.text,max_recursion_depth=max_recursion_depth)["articles"])
-                output["timeadded"] = [pattern.findall(query_string)[1]] * len(output)
+                output = pd.DataFrame(
+                    load_json(
+                        response.text,
+                        max_recursion_depth=max_recursion_depth)["articles"])
+                output["timeadded"] = [pattern.findall(query_string)[1]
+                                       ] * len(output)
                 return output
             elif mode == "timelinevol" or "timelinevolraw" or "timelinetone" or "timelinetone" or "timelinelang" or "timelinesourcecountry":
                 return pd.DataFrame(
                     load_json(response.text)["timeline"][0]["data"])
+
+
+def geo_query_search(query_string:str = None,
+                     format: str = "GeoJSON",
+                     timespan: int = 1,
+                     proxy: dict = None):
+
+    if query_string == None:
+        return ValueError("Query string must be provided")
+    else:
+        query_string = query_string
+        response = requests.get(
+            f"https://api.gdeltproject.org/api/v2/geo/geo?query={query_string}&format={format}&timespan={timespan}d",
+            proxies=proxy)
+
+        if response.text == "Timespan is too short.\n":
+            return ValueError("Timespan is too short.")
+
+        return response.text
 
 
 def article_search(query_filter=None,
@@ -130,13 +152,19 @@ def article_search(query_filter=None,
                                           newstring=tmp_date_string,
                                           text=tmp_query_string)
             query_string.append(tmp_query_string)
-        
-        pool = multiprocessing.Pool(cpu_num)
-        worker = partial(doc_query_search, max_recursion_depth=max_recursion_depth, mode="artlist", proxy=proxy)
-        print("[+] Downloading...")
-        articles_list = list(tqdm.tqdm(pool.imap_unordered(worker, query_string), total=len(query_string)))
 
-        return pd.concat(articles_list).drop_duplicates().reset_index(drop=True)
+        pool = multiprocessing.Pool(cpu_num)
+        worker = partial(doc_query_search,
+                         max_recursion_depth=max_recursion_depth,
+                         mode="artlist",
+                         proxy=proxy)
+        print("[+] Downloading...")
+        articles_list = list(
+            tqdm.tqdm(pool.imap_unordered(worker, query_string),
+                      total=len(query_string)))
+
+        return pd.concat(articles_list).drop_duplicates().reset_index(
+            drop=True)
     except Exception as e:
         return (e)
 
@@ -154,4 +182,24 @@ def timeline_search(query_filter=None,
                                 mode=query_mode)
     timeline["date"] = pd.to_datetime(timeline["date"],
                                       format="%Y%m%dT%H%M%SZ")
+    return timeline
+
+
+def geo_search(query_filter=None,
+               sourcelang: str = None,
+               format: str = "GeoJSON",
+               timespan: int = 1, proxy:dict=None):
+
+    if query_filter == None:
+        return ValueError("Filter must be provided")
+
+    tmp_query_string = " ".join(query_filter.query_string.split(" ")[:-1])
+    if sourcelang != None:
+        tmp_query_string = tmp_query_string + " sourcelang:{}".format(
+            sourcelang)
+
+    timeline = geo_query_search(query_string=tmp_query_string,
+                                format=format,
+                                timespan=timespan, proxy=proxy)
+
     return timeline
