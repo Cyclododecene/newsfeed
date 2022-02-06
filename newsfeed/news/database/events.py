@@ -121,10 +121,14 @@ class EventV1(object):
         print("[+] Downloading... date:{}".format(
             datetime.strftime(dt, "%Y-%m-%d")))
         results = self._download_file(url=url)
+        results.columns=self.columns_name
         if type(results) == "str":
             print(results)
             return None
-        return results
+        else:
+            results.reset_index(drop=True, inplace=True)
+            results.columns = self.columns_name
+            return results
 
 
 class EventV2(object):
