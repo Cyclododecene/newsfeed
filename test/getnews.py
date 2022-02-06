@@ -1,120 +1,27 @@
-##################################################
-###                                            ###
-### Example of getting news from GDELT Doc API ###
-### __AUTHOR__ = "Terence Liu"                 ###
-### __DATE__ = "2022-01-11"                    ###
-###                                            ###
-##################################################
+from newsfeed.news.database.events import *
+from newsfeed.utils import fulltext as ft
 
-import tqdm
-import requests
-from newspaper import Config
-from newspaper import Article
-from newsfeed.news.apis.query import *
-from newsfeed.news.apis.filters import *
-from fake_useragent import UserAgent
+events = Event_V2(start_date="2022-02-06-00-00-00", end_date="2022-02-06-12-00-00")
+events_list = events.query_nowtime()
 
 
-def generate_header():
-    ua = UserAgent()
-    header = {"User-Agent": str(ua.random)}
-    return header
+mentions = Event_V2(start_date="2022-02-06-00-00-00", end_date="2022-02-06-12-00-00", table="mentions")
+mentions_list = mentions.query_nowtime()
+
+intersection_list = list(set(mentions_list["GLOBALEVENTID"]).intersection(set(events_list["GLOBALEVENTID"])))
 
 
-f = Art_Filter(keyword=["Exchange Rate", "World"],
-               start_date="2017-12-31-00-00-00",
-               end_date="2017-12-31-01-00-00",
-               country=["China", "US"])
+'''
+NumSources. (integer) This is the total number of information sources containing one or more 
+mentions of this event during the 15 minute update in which it was first seen. This can be used 
+as a method of assessing the “importance” of an event: the more discussion of that event, the 
+more likely it is to be significant.
 
-articles_30 = article_search(query_filter=f,
-                             max_recursion_depth=100,
-                             time_range=30)
+'''
+events_list["NumSources"]
 
-articles_e = articles_30[articles_30['language'] == "English"]
-articles_e.reset_index(drop=True, inplace=True)
-
-
-def _get(url):
-    config = Config()
-    config.browser_user_agent = generate_header()["User-Agent"]
-    config.request_timeout = 50
-    config.number_threads = 60
-    config.thread_timeout_seconds = 10
-    article = Article(url, config=config)
-    article.download()
-    article.parse()
-    article_info = {
-        "title": article.title,
-        "authors": article.authors,
-        "publish_date": article.publish_date,
-        "text": article.text,
-        "url": url
-    }
-    return article_info
-
-
-## directly get news from url
-def download_direct(url):
-    try:
-        return _get(url)
-    except Exception as e:
-        print("Error in downloading {} \n Error: \n{}".format(url, e))
-        pass  # return None
-
-
-## get news from url from internet archive
-def download_arxiv(url):  # arxiv means internet archive
-    url = url.split("//")[1]
-    response = requests.get(
-        "https://archive.org/wayback/available?url={}".format(url),
-        timeout=20,
-        headers=generate_header(),
-        stream=True)
-    response_json = response.json()
-    if response_json["archived_snapshots"] == {}:
-        print("No archive found")
-        pass  # return None
-    else:
-        archive_url = response_json["archived_snapshots"]["closest"]["url"]
-        archive_url = archive_url.replace("http://", "https://")
-        try:
-            return _get(archive_url)
-        except Exception as e:
-            print("Error in downloading {} \n Error: \n{}".format(
-                archive_url, e))
-            pass  # return None
-
-
-def check_url(url):
-    print("\n[+]Checking if page exists...")
-    try:
-        # Requesting for only the HTTP header without downloading the page
-        # If the page doesn't exist (404), it's a waste of resources to try scraping.
-        response = requests.head(url, timeout=10, headers=generate_header())
-        if "not found" in response.text:
-            return 404
-        else:
-            return int(response.status_code)
-    except:
-        print("Connection related Error/Timeout, skipping...")
-        return int(404)
-
-
-def download_news(url):
-    try:
-        if check_url(url=url) != 404:
-            return download_direct(url)
-        else:
-            return download_arxiv(url)
-    except Exception as e:
-        print(e)
-        pass  # return None
-
-
-result = []
-for i in tqdm.tqdm(range(0, 20)):
-    result.append(download_news(articles_e.loc[i, 'url']))
-
-
-
+news_fulltext = []
+news_list = events_list[(events_list["Actor1CountryCode"] == "CHN") & (events_list["Actor2CountryCode"]=="CHN")]
+for i in range(0, len(news_list)):
+    news_fulltext.append(ft.download(url=list(news_list["SOURCEURL"])[i]))
 

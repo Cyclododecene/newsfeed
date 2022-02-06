@@ -9,7 +9,7 @@ import requests
 import pandas as pd
 from lxml import html
 import multiprocessing
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from fake_useragent import UserAgent
 
 import warnings
@@ -133,7 +133,7 @@ class Event_V2(object):
 
     columns_name_mentions = [
         'GLOBALEVENTID', 'EventTimeDate', 'MentionTimeDate', 'MentionType',
-        'MentionSourceName', 'Mentiondentifier', 'SentenceID',
+        'MentionSourceName', 'Mentionidentifier', 'SentenceID',
         'Actor1CharOffset', 'Actor2CharOffset', 'ActionCharOffset',
         'InRawText', 'Confidence', 'MentionDocLen', 'MentionDocTone',
         'MentionDocTranslationInfo', "Extras"
@@ -232,6 +232,29 @@ class Event_V2(object):
                 return results
         except Exception as e:
             return e
+    
+    def query_nowtime(self):
+        dt = datetime.now(timezone.utc)
+        if self.translation:
+            if self.table != "mentions":
+                url = datetime.strftime(datetime(dt.year, dt.month, dt.day, dt.hour, 15*(dt.minute // 15)), "%Y%m%d%H%M%S") + ".translation.export.CSV.zip"
+            else:
+                url = datetime.strftime(datetime(dt.year, dt.month, dt.day, dt.hour, 15*(dt.minute // 15)), "%Y%m%d%H%M%S") + ".translation.mentions.CSV.zip"
+        else:
+            if self.table != "mentions":
+                url = datetime.strftime(datetime(dt.year, dt.month, dt.day, dt.hour, 15*(dt.minute // 15)), "%Y%m%d%H%M%S") + ".export.CSV.zip"
+            else:
+                url = datetime.strftime(datetime(dt.year, dt.month, dt.day, dt.hour, 15*(dt.minute // 15)), "%Y%m%d%H%M%S") + ".mentions.CSV.zip"
+                
+        results = self._download_file(url=url)
+        results.reset_index(drop=True, inplace=True)
+        if self.table == "events":
+            results.columns = self.columns_name_events
+            return results
+        else:
+            results.columns = self.columns_name_mentions
+            return results
+        
 
 
 if __name__ == "__main__":
