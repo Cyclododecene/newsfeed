@@ -55,11 +55,14 @@ class Event_V1(object):
         return header
 
     def _query_list(self) -> list:
-        download_url_list = [datetime.strftime(i, "%Y%m%d") + ".export.CSV.zip" for i in pd.date_range(self.start_date, self.end_date, freq="D")]
+        download_url_list = [
+            datetime.strftime(i, "%Y%m%d") + ".export.CSV.zip"
+            for i in pd.date_range(self.start_date, self.end_date, freq="D")
+        ]
         return download_url_list
 
     # tp = pd.read_csv('Check1_900.csv', sep='\t', iterator=True, chunksize=1000)
-    def _download_file(self, url:str="20200101.export.CSV.zip"):
+    def _download_file(self, url: str = "20200101.export.CSV.zip"):
         download_url = self.base_url + url
         time.sleep(0.0005)
         try:
@@ -89,7 +92,8 @@ class Event_V1(object):
         download_url_list = self._query_list()
         pool = multiprocessing.Pool(self.cpu_num)
         try:
-            print("[+] Downloading... [startdate={} & enddate={}]".format(self.start_date, self.end_date))
+            print("[+] Downloading... [startdate={} & enddate={}]".format(
+                self.start_date, self.end_date))
             downloaded_dfs = list(
                 tqdm.tqdm(pool.imap_unordered(self._download_file,
                                               download_url_list),
@@ -104,6 +108,20 @@ class Event_V1(object):
             return results
         except Exception as e:
             return e
+
+    def query_nowtime(self, date:str=None):
+        # by default the self.start_date variable is None, then the func will query for the nearest files
+        # if self.start_date is valued, then the func will query the given datetime
+        if date == None:
+            dt = datetime.now(timezone.utc)
+        else:
+            dt = datetime.strptime(date, "%Y-%m-%d")
+
+        url = datetime.strftime(dt, "%Y%m%d") + ".export.CSV.zip"
+        results = self._download_file(url=url)
+        results.reset_index(drop=True, inplace=True)
+        results.columns = self.columns_name
+        return results
 
 
 class Event_V2(object):
@@ -140,7 +158,7 @@ class Event_V2(object):
     ]
 
     def __init__(self,
-                 start_date: str = "2020-01-01-00-00-00",
+                 start_date: str = "2021-12-30-00-00-00",
                  end_date: str = "2021-12-31-00-00-00",
                  table: str = "events",
                  translation: bool = False,
@@ -167,19 +185,35 @@ class Event_V2(object):
             if self.translation == True:
                 print("[+] Scraping data from GDELT Project...")
                 if self.table == "events":
-                    download_url_list = [datetime.strftime(i, "%Y%m%d%H%M%S") + ".translation.export.CSV.zip" for i in pd.date_range(self.start_date, self.end_date, freq="15min")]
+                    download_url_list = [
+                        datetime.strftime(i, "%Y%m%d%H%M%S") +
+                        ".translation.export.CSV.zip" for i in pd.date_range(
+                            self.start_date, self.end_date, freq="15min")
+                    ]
                     return download_url_list
                 elif self.table == "mentions":
-                    download_url_list = [datetime.strftime(i, "%Y%m%d%H%M%S") + ".translation.mentions.CSV.zip" for i in pd.date_range(self.start_date, self.end_date, freq="15min")]
+                    download_url_list = [
+                        datetime.strftime(i, "%Y%m%d%H%M%S") +
+                        ".translation.mentions.CSV.zip" for i in pd.date_range(
+                            self.start_date, self.end_date, freq="15min")
+                    ]
                     return download_url_list
 
             else:
                 print("[+] Scraping data from GDELT Project...")
                 if self.table == "events":
-                    download_url_list = [datetime.strftime(i, "%Y%m%d%H%M%S") + ".export.CSV.zip" for i in pd.date_range(self.start_date, self.end_date, freq="15min")]
+                    download_url_list = [
+                        datetime.strftime(i, "%Y%m%d%H%M%S") +
+                        ".export.CSV.zip" for i in pd.date_range(
+                            self.start_date, self.end_date, freq="15min")
+                    ]
                     return download_url_list
                 elif self.table == "mentions":
-                    download_url_list = [datetime.strftime(i, "%Y%m%d%H%M%S") + ".mentions.CSV.zip" for i in pd.date_range(self.start_date, self.end_date, freq="15min")]
+                    download_url_list = [
+                        datetime.strftime(i, "%Y%m%d%H%M%S") +
+                        ".mentions.CSV.zip" for i in pd.date_range(
+                            self.start_date, self.end_date, freq="15min")
+                    ]
                     return download_url_list
 
     def _download_file(self, url: str = "20220108160000.export.CSV.zip"):
@@ -212,7 +246,8 @@ class Event_V2(object):
         download_url_list = self._query_list()
         pool = multiprocessing.Pool(self.cpu_num)
         try:
-            print("[+] Downloading... [startdate={} & enddate={}]".format(self.start_date, self.end_date))
+            print("[+] Downloading... [startdate={} & enddate={}]".format(
+                self.start_date, self.end_date))
             downloaded_dfs = list(
                 tqdm.tqdm(pool.imap_unordered(self._download_file,
                                               download_url_list),
@@ -220,7 +255,9 @@ class Event_V2(object):
             pool.close()
             pool.terminate()
             pool.join()
-            results = [data for data in downloaded_dfs if type(data) == pd.DataFrame] # remove non DataFrame (e.g. Error)
+            results = [
+                data for data in downloaded_dfs if type(data) == pd.DataFrame
+            ]  # remove non DataFrame (e.g. Error)
             results = pd.concat(results)
             del downloaded_dfs
             results.reset_index(drop=True, inplace=True)
@@ -232,20 +269,38 @@ class Event_V2(object):
                 return results
         except Exception as e:
             return e
-    
-    def query_nowtime(self):
-        dt = datetime.now(timezone.utc)
+
+    def query_nowtime(self, date:str=None):
+        # by default the self.start_date variable is None, then the func will query for the nearest files
+        # if self.start_date is valued, then the func will query the given datetime
+        if date == None:
+            dt = datetime.now(timezone.utc)
+        else:
+            dt = datetime.strptime(date, "%Y-%m-%d-%H-%M-%S")
+
         if self.translation:
             if self.table != "mentions":
-                url = datetime.strftime(datetime(dt.year, dt.month, dt.day, dt.hour, 15*(dt.minute // 15)), "%Y%m%d%H%M%S") + ".translation.export.CSV.zip"
+                url = datetime.strftime(
+                    datetime(dt.year, dt.month, dt.day, dt.hour, 15 *
+                             (dt.minute // 15)),
+                    "%Y%m%d%H%M%S") + ".translation.export.CSV.zip"
             else:
-                url = datetime.strftime(datetime(dt.year, dt.month, dt.day, dt.hour, 15*(dt.minute // 15)), "%Y%m%d%H%M%S") + ".translation.mentions.CSV.zip"
+                url = datetime.strftime(
+                    datetime(dt.year, dt.month, dt.day, dt.hour, 15 *
+                             (dt.minute // 15)),
+                    "%Y%m%d%H%M%S") + ".translation.mentions.CSV.zip"
         else:
             if self.table != "mentions":
-                url = datetime.strftime(datetime(dt.year, dt.month, dt.day, dt.hour, 15*(dt.minute // 15)), "%Y%m%d%H%M%S") + ".export.CSV.zip"
+                url = datetime.strftime(
+                    datetime(dt.year, dt.month, dt.day, dt.hour, 15 *
+                             (dt.minute // 15)),
+                    "%Y%m%d%H%M%S") + ".export.CSV.zip"
             else:
-                url = datetime.strftime(datetime(dt.year, dt.month, dt.day, dt.hour, 15*(dt.minute // 15)), "%Y%m%d%H%M%S") + ".mentions.CSV.zip"
-                
+                url = datetime.strftime(
+                    datetime(dt.year, dt.month, dt.day, dt.hour, 15 *
+                             (dt.minute // 15)),
+                    "%Y%m%d%H%M%S") + ".mentions.CSV.zip"
+
         results = self._download_file(url=url)
         results.reset_index(drop=True, inplace=True)
         if self.table == "events":
@@ -254,7 +309,6 @@ class Event_V2(object):
         else:
             results.columns = self.columns_name_mentions
             return results
-        
 
 
 if __name__ == "__main__":
