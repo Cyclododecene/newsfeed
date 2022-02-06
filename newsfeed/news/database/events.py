@@ -124,6 +124,7 @@ class EventV1(object):
         if type(results) == "str":
             print(results)
             return None
+        return results
 
 
 class EventV2(object):
