@@ -288,9 +288,9 @@ class GFG(object):
         if response.ok:
             print("[+] Loading...")
             result = pd.read_csv(url,
-                                  compression="gzip",
-                                  sep="  ",
-                                  on_bad_lines="skip")
+                                 compression="gzip",
+                                 sep="  ",
+                                 on_bad_lines="skip")
             return result
         else:
             return ValueError(

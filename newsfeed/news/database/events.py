@@ -109,7 +109,7 @@ class Event_V1(object):
         except Exception as e:
             return e
 
-    def query_nowtime(self, date:str=None):
+    def query_nowtime(self, date: str = None):
         # by default the self.start_date variable is None, then the func will query for the nearest files
         # if self.start_date is valued, then the func will query the given datetime
         if date == None:
@@ -118,7 +118,8 @@ class Event_V1(object):
             dt = datetime.strptime(date, "%Y-%m-%d")
 
         url = datetime.strftime(dt, "%Y%m%d") + ".export.CSV.zip"
-        print("[+] Downloading... date:{}".format(datetime.strftime(dt, "%Y-%m-%d")))
+        print("[+] Downloading... date:{}".format(
+            datetime.strftime(dt, "%Y-%m-%d")))
         results = self._download_file(url=url)
         if type(results) == "str":
             print(results)
@@ -271,7 +272,7 @@ class Event_V2(object):
         except Exception as e:
             return e
 
-    def query_nowtime(self, date:str=None):
+    def query_nowtime(self, date: str = None):
         # by default the self.start_date variable is None, then the func will query for the nearest files
         # if self.start_date is valued, then the func will query the given datetime
         if date == None:
@@ -302,7 +303,8 @@ class Event_V2(object):
                              (dt.minute // 15)),
                     "%Y%m%d%H%M%S") + ".mentions.CSV.zip"
 
-        print("[+] Downloading... date:{}".format(datetime.strftime(dt, "%Y-%m-%d %H:%M:%S")))
+        print("[+] Downloading... date:{}".format(
+            datetime.strftime(dt, "%Y-%m-%d %H:%M:%S")))
         results = self._download_file(url=url)
         results.reset_index(drop=True, inplace=True)
         if self.table == "events":

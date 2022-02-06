@@ -9,6 +9,7 @@ def generate_header():
     header = {"User-Agent": str(ua.random)}
     return header
 
+
 # original code for newspaper3k and internet archive: https://github.com/johnbumgarner/newspaper3_usage_overview
 def _get(url):
     config = Config()
@@ -82,8 +83,8 @@ def download(url):
 
 
 if __name__ == "__main__":
-    art = download(url="https://english.news.cn/20220205/a4e93df9162e4053af64c392b5f5bfec/c.html")
+    art = download(
+        url=
+        "https://english.news.cn/20220205/a4e93df9162e4053af64c392b5f5bfec/c.html"
+    )
     print("full text: \n {}".format(art.text))
-
-
-
