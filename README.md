@@ -94,7 +94,7 @@ f = Art_Filter(
     keyword = ["Exchange Rate", "World"],
     country = ["China", "US"]
 )
-timelineraw = geo_search(query_filter = f, sourcelang="english", timespan=7)
+geo_7d = geo_search(query_filter = f, sourcelang="english", timespan=7)
 ```
 
 query_mode:
