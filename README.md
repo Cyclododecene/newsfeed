@@ -140,6 +140,10 @@ gdelt_v3_vgeg_result = gdelt_v3_vgeg.query()
 # GDELT Global Difference Graph
 gdelt_v3_gdg = GDG(query_date="2018-08-27-14-00-00")
 gdelt_v3_gdg_result = gdelt_v3_gdg.query()
+
+# GDELT Global Frontpage Graph
+gdelt_v3_gfg = GFG(query_date="2018-03-02-02-00-00")
+gdelt_v3_gfg_result = gdelt_v3_gfg.query()
 ```
 
 ### Utils
