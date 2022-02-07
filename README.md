@@ -109,7 +109,7 @@ most of the parameters are the same with [gdelt-doc-api](https://github.com/alex
 For event database (both V1 and V2):
 
 ```python
-from newsfeed.news.database.events import *
+from newsfeed.news.db.events import *
 # GDELT Event Database Version 1.0
 gdelt_events_v1_events = EventV1(start_date = "2021-01-01", end_date = "2021-01-02")
 results_v1_events = gdelt_events_v1_events.query()
@@ -130,13 +130,13 @@ results_v2_mentions_nowtime = gdelt_events_v2_mentions.query_nowtime()
 For GKG databse (both V1 and V2):
 
 ```python
-from newsfeed.news.database.gkg import *
+from newsfeed.news.db.gkg import *
 # GDELT GKG Database Version 1.0
 gdelt_events_v1_gkg = GKGV1(start_date = "2021-01-01", end_date = "2021-01-02")
 results_v1_gkg = gdelt_events_v1_gkg.query()
 results_v1_gkg_nowtime = gdelt_events_v1_gkg.query_nowtime()
 
-from newsfeed.news.database.gkg import *
+from newsfeed.news.db.gkg import *
 # GDELT GKG Database Version 2.0
 gdelt_events_v2_gkg = GKGV2(start_date = "2021-01-01-00-00-00", end_date = "2021-01-02-00-00-00")
 results_v2_gkg = gdelt_events_v2_gkg.query()
@@ -146,7 +146,7 @@ results_v2_gkg_nowtime = gdelt_events_v2_gkg.query_nowtime()
 For GEG, VGEG and GDG:
 
 ```python
-from newsfeed.news.database.others import *
+from newsfeed.news.db.others import *
 # GDELT Global Entity Graph
 gdelt_v3_geg = GEG(start_date = "2020-01-01", end_date = "2020-01-02")
 gdelt_v3_geg_result = gdelt_v3_geg.query()
@@ -164,7 +164,7 @@ gdelt_v3_gfg = GFG(query_date="2018-03-02-02-00-00")
 gdelt_v3_gfg_result = gdelt_v3_gfg.query()
 ```
 
-### Utils
+### Utilities
 
 Full-text downloader (based on [`newspaper3k`](https://github.com/codelucas/newspaper) and [Wayback Machine](https://archive.org/help/wayback_api.php))
 
