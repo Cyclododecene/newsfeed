@@ -238,7 +238,7 @@ class GKGV2(object):
         if self.translation:
             url = datetime.strftime(
                 datetime(dt.year, dt.month, dt.day, dt.hour, 15 *
-                         (dt.minute // 15)),
+                         (dt.minute // 15)) - timedelta(minutes=15),
                 "%Y%m%d%H%M%S") + ".translation.gkg.csv.zip"
         else:
             url = datetime.strftime(
@@ -256,12 +256,12 @@ class GKGV2(object):
 if __name__ == "__main__":
 
     # GDELT GKG Database Version 1.0
-    gdelt_events_v1_gkg = GKGV1(start_date="2021-01-01",
-                                 end_date="2021-01-02")
+    gdelt_events_v1_gkg = GKGV1(start_date="2021-01-01", end_date="2021-01-02")
     results_v1_gkg = gdelt_events_v1_gkg.query()
 
     # GDELT GKG Database Version 2.0
     gdelt_events_v2_gkg = GKGV2(start_date="2021-01-01",
-                                 end_date="2021-01-02",
-                                 translation=False)
+                                end_date="2021-01-02",
+                                translation=False)
     results_v2_gkg = gdelt_events_v2_gkg.query()
+
