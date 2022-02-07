@@ -19,7 +19,7 @@ python setup install
 Based on the [gdelt-doc-api](https://github.com/alex9smith/gdelt-doc-api/), we consider a continuous querying mechanism by spliting the time range into multiple sub range (default setting is every 60 minutes).
 
 * FIPS 2 letter Contries list: please check: [LOOK-UP COUNTRIES](http://data.gdeltproject.org/api/v2/guides/LOOKUP-COUNTRIES.TXT)
-* GKG Themes list: please check: [LOOK-UP THEMES](http://data.gdeltproject.org/api/v2/guides/LOOKUP-GKGTHEMES.TXT)
+* GKG Themes list: please check: [LOOK-UP THEMES](http://data.gdeltproject.org/documentation/GKG-MASTER-THEMELIST.TXT)
 
 The URL encoding reference: [url encode](https://www.eso.org/~ndelmott/url_encode.html)
 
