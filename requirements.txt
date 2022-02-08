@@ -13,7 +13,6 @@ importlib-metadata==4.10.1
 jieba3k==0.35.1
 joblib==1.1.0
 lxml==4.7.1
-newsfeed==0.1.0
 newspaper3k==0.2.8
 nltk==3.6.7
 numpy==1.21.5
