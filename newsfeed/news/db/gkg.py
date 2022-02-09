@@ -113,9 +113,10 @@ class GKGV1(object):
         print("[+] Downloading... date:{}".format(
             datetime.strftime(dt, "%Y-%m-%d")))
         results = self._download_file(url=url)
-        if type(results) == "str":
+        if type(results) != pd.DataFrame:
             print(results)
-            return None
+            results = self.query_nowtime(date=datetime.strftime(dt - timedelta(days=1), "%Y-%m-%d"))
+            return results
         else:
             results.reset_index(drop=True, inplace=True)
             results.columns = self.columns_name

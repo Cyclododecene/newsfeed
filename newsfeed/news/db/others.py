@@ -274,7 +274,7 @@ class GFG(object):
         url = self.base_url + "lastupdate.txt"
         latest_url = list(
             pd.read_csv(url, sep=" ", names=["a", "b", "url"])["url"])[0]
-        reg = re.compile("\d{14}")
+        reg = re.compile("\\d{14}")
         date = reg.findall(latest_url)[0]
         print("The latest file is: {}".format(
             datetime.strftime(datetime.strptime(date, "%Y%m%d%H%M%S"),

@@ -11,7 +11,6 @@ __pycache__/
 # ignore database
 *.db
 *.sqlite3
-*test/
 # C extensions
 *.so
 

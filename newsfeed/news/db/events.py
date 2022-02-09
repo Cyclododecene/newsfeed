@@ -113,7 +113,7 @@ class EventV1(object):
         # by default the self.start_date variable is None, then the func will query for the nearest files
         # if self.start_date is valued, then the func will query the given datetime
         if date == None:
-            dt = datetime.now(timezone.utc)
+            dt = datetime.now(timezone.utc) - timedelta(days=1)
         else:
             dt = datetime.strptime(date, "%Y-%m-%d")
 
@@ -121,9 +121,10 @@ class EventV1(object):
         print("[+] Downloading... date:{}".format(
             datetime.strftime(dt, "%Y-%m-%d")))
         results = self._download_file(url=url)
-        if type(results) == "str":
+        if type(results) != pd.DataFrame:
             print(results)
-            return None
+            results = self.query_nowtime(date=datetime.strftime(dt - timedelta(days=1), "%Y-%m-%d"))
+            return results
         else:
             results.reset_index(drop=True, inplace=True)
             results.columns = self.columns_name
