@@ -1,5 +1,6 @@
 # NewsFeed
 [![py_version](https://img.shields.io/badge/python-3.7+-brightgreen)](https://www.python.org/)
+[![PyPI Version](https://img.shields.io/pypi/v/newsfeed.svg)](https://pypi.org/project/newsfeed)
 [![GDLET_version](https://img.shields.io/badge/GDELT-V1&V2-orange)](https://gdeltproject.org)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
