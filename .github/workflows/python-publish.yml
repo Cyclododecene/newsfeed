@@ -9,13 +9,19 @@
 name: Upload Python Package
 
 on:
-  release:
-    types: [published]
+  push:
+    branches:
+      - publish
+    
 
 jobs:
   deploy:
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, maxOS-latest, windows-latest]
 
     steps:
     - uses: actions/checkout@v2
