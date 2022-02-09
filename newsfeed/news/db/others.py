@@ -201,8 +201,8 @@ class VGEG(object):
         download_url_list = self._query_list()
         pool = multiprocessing.Pool(self.cpu_num)
         try:
-            print("[+] Downloading... [startdate={} & enddate={}]".format(
-                self.start_date, self.end_date))
+            print("[+] Downloading... [startdate={}]".format(
+                self.query_date))
             downloaded_dfs = list(
                 tqdm.tqdm(pool.imap_unordered(self._download_file,
                                               download_url_list),
@@ -257,7 +257,7 @@ class GDG(object):
 class GFG(object):
 
     base_url = "http://data.gdeltproject.org/gdeltv3/gfg/alpha/"
-
+    columns_name = ["DATE", "FromFrontPageURL", "LinkID", "LinkPercentMaxID", "ToLinkURL", "LinkText"]
     def __init__(self,
                  query_date: str = "2018-07-27-14-00-00",
                  proxy: dict = None):
@@ -289,8 +289,9 @@ class GFG(object):
             print("[+] Loading...")
             result = pd.read_csv(url,
                                  compression="gzip",
-                                 sep="  ",
+                                 sep="\t",
                                  on_bad_lines="skip")
+            result.columns = self.columns_name
             return result
         else:
             return ValueError(
