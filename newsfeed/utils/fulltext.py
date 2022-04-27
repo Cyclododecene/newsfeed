@@ -69,7 +69,7 @@ def check_url(url):
     try:
         # Requesting for only the HTTP header without downloading the page
         # If the page doesn't exist, it's a waste of resources to try scraping (directly).
-        response = requests.head(url, timeout=240, headers=generate_header())
+        response = requests.get(url, timeout=240, headers=generate_header())
         if response.status_code != 200:
             return int(404)
     except:
