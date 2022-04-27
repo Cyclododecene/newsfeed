@@ -14,9 +14,9 @@ def generate_header():
 def _get(url):
     config = Config()
     config.browser_user_agent = generate_header()["User-Agent"]
-    config.request_timeout = 50
+    config.request_timeout = 120
     config.number_threads = 60
-    config.thread_timeout_seconds = 10
+    config.thread_timeout_seconds = 120
     article = Article(url, config=config)
     article.download()
     article.parse()
@@ -38,7 +38,7 @@ def download_arxiv(url):  # arxiv means internet archive
     url = url.split("//")[1]
     response = requests.get(
         "https://archive.org/wayback/available?url={}".format(url),
-        timeout=20,
+        timeout=120,
         headers=generate_header(),
         stream=True)
     response_json = response.json()
@@ -60,8 +60,8 @@ def check_url(url):
     print("[+] Checking if page exists...")
     try:
         # Requesting for only the HTTP header without downloading the page
-        # If the page doesn't exist (404), it's a waste of resources to try scraping.
-        response = requests.head(url, timeout=10, headers=generate_header())
+        # If the page doesn't exist, it's a waste of resources to try scraping (directly).
+        response = requests.head(url, timeout=120)
         if response.status_code != 200:
             return int(404)
     except:
