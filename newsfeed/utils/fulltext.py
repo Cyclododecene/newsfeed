@@ -35,7 +35,6 @@ def download_direct(url):
 
 ## get news from url from internet archive
 def download_arxiv(url):  # arxiv means internet archive
-    url = url.split("//")[1]
     response = requests.get(
         "https://archive.org/wayback/available?url={}".format(url),
         timeout=120,
