@@ -62,10 +62,8 @@ def check_url(url):
         # Requesting for only the HTTP header without downloading the page
         # If the page doesn't exist (404), it's a waste of resources to try scraping.
         response = requests.head(url, timeout=10, headers=generate_header())
-        if "not found" in response.text:
-            return 404
-        else:
-            return int(response.status_code)
+        if response.status_code != 200:
+            return int(404)
     except:
         print(":( Connection related Error/Timeout, skipping...")
         return int(404)
