@@ -3,7 +3,7 @@ import os
 
 setup(
     name="newsfeed",
-    version="0.1.1",
+    version="0.1.2",
     keywords="GDELT NewsFeed",
     long_description=open(os.path.join(os.path.dirname(__file__),
                                        'README.md')).read(),
