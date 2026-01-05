@@ -2,6 +2,9 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,visualstudiocode
 
+.pixi/*
+
+
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -165,3 +168,6 @@ cython_debug/
 !.vscode/*.code-snippets
 
 # End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode
+# pixi environments
+.pixi/*
+!.pixi/config.toml
