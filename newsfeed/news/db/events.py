@@ -12,6 +12,8 @@ import multiprocessing
 from datetime import datetime, timedelta, timezone
 from fake_useragent import UserAgent
 
+from tenacity import retry, stop_after_attempt
+
 import warnings
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -54,6 +56,7 @@ class EventV1(object):
         header = {"User-Agent": str(ua.random)}
         return header
 
+    @retry(stop=stop_after_attempt(3))
     def _query_list(self) -> list:
         download_url_list = [
             datetime.strftime(i, "%Y%m%d") + ".export.CSV.zip"
@@ -62,7 +65,12 @@ class EventV1(object):
         return download_url_list
 
     # tp = pd.read_csv('Check1_900.csv', sep='\t', iterator=True, chunksize=1000)
+    @retry(stop=stop_after_attempt(3))
     def _download_file(self, url: str = "20200101.export.CSV.zip"):
+        '''
+        fixed: add retry mechanism
+        fixed: replace write_bad_lines with on_bad_lines
+        '''
         download_url = self.base_url + url
         time.sleep(0.0005)
         try:
@@ -79,7 +87,7 @@ class EventV1(object):
                                           compression="zip",
                                           sep="\t",
                                           header=None,
-                                          warn_bad_lines=False,
+                                          on_bad_lines='skip',
                                           low_memory=False)
                 #response_text.flush()
                 #response_text.close()
@@ -181,6 +189,7 @@ class EventV2(object):
         header = {"User-Agent": str(ua.random)}
         return header
 
+    @retry(stop=stop_after_attempt(3))
     def _query_list(self) -> list:
 
         if self.table != "events" and self.table != "mentions":
@@ -223,6 +232,7 @@ class EventV2(object):
                     ]
                     return download_url_list
 
+    @retry(stop=stop_after_attempt(3))
     def _download_file(self, url: str = "20220108160000.export.CSV.zip"):
         download_url = self.base_url + url
         time.sleep(0.0005)
@@ -240,7 +250,7 @@ class EventV2(object):
                                           compression="zip",
                                           sep="\t",
                                           header=None,
-                                          warn_bad_lines=False,
+                                          on_bad_lines='skip',
                                           low_memory=False)
                 #response_text.flush()
                 #response_text.close()

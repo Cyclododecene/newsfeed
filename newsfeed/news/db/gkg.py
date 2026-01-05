@@ -13,6 +13,8 @@ import multiprocessing
 from datetime import datetime, timezone, timedelta
 from fake_useragent import UserAgent
 
+from tenacity import retry, stop_after_attempt
+
 import warnings
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -40,6 +42,7 @@ class GKGV1(object):
         header = {"User-Agent": str(ua.random)}
         return header
 
+    @retry(stop=stop_after_attempt(3))
     def _query_list(self) -> list:
         print("[+] Scraping data from GDELT Project...")
         page = requests.get("http://data.gdeltproject.org/gkg/index.html",
@@ -54,6 +57,7 @@ class GKGV1(object):
         ]
         return download_url_list
 
+    @retry(stop=stop_after_attempt(3))
     def _download_file(self, url: str = "20200101.gkg.csv.zip"):
         download_url = self.base_url + url
         time.sleep(0.0005)
@@ -71,7 +75,7 @@ class GKGV1(object):
                                           compression="zip",
                                           sep="\t",
                                           header=None,
-                                          warn_bad_lines=False,
+                                          on_bad_lines='skip',
                                           low_memory=False)
                 response_text.flush()
                 response_text.close()
@@ -148,10 +152,11 @@ class GKGV2(object):
         self.proxy = proxy
 
     def _generate_header(self):
-        ua = UserAgent(verify_ssl=False)
+        ua = UserAgent()
         header = {"User-Agent": str(ua.random)}
         return header
 
+    @retry(stop=stop_after_attempt(3))
     def _query_list(self) -> list:
 
         if self.translation == True:
@@ -171,6 +176,7 @@ class GKGV2(object):
             ]
             return download_url_list
 
+    @retry(stop=stop_after_attempt(3))
     def _download_file(self, url: str = None):
         download_url = self.base_url + url
         time.sleep(0.001)
@@ -191,6 +197,7 @@ class GKGV2(object):
                                               compression="zip",
                                               sep="\t",
                                               header=None,
+                                              on_bad_lines='skip',
                                               low_memory=False,
                                               encoding="utf-8")
                 except UnicodeDecodeError:
@@ -198,6 +205,7 @@ class GKGV2(object):
                                               compression="zip",
                                               sep="\t",
                                               header=None,
+                                              on_bad_lines='skip',
                                               low_memory=False,
                                               encoding="latin-1")
                 response_text.flush()

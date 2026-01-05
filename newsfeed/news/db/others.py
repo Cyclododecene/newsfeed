@@ -13,6 +13,8 @@ import multiprocessing
 from datetime import datetime, timedelta
 from fake_useragent import UserAgent
 
+from tenacity import retry, stop_after_attempt
+
 import warnings
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -37,6 +39,7 @@ class GEG(object):
         header = {"User-Agent": str(ua.random)}
         return header
 
+    @retry(stop=stop_after_attempt(3))
     def _query_list(self) -> list:
 
         print("[+] Scraping data from GDELT Project...")
@@ -55,6 +58,7 @@ class GEG(object):
                 end_date, url_list))
         return download_url_list
 
+    @retry(stop=stop_after_attempt(3))
     def _download_file(
         self,
         url:
