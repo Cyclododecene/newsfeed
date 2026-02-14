@@ -90,13 +90,21 @@ def doc_query_search(query_string=None,
 
         else:
             if mode == "artlist":
-                pattern = re.compile('\d{14}')
+                pattern = re.compile(r'\d{14}')
                 output = pd.DataFrame(
                     load_json(
                         response.text,
                         max_recursion_depth=max_recursion_depth)["articles"])
-                output["timeadded"] = [pattern.findall(query_string)[1]
-                                       ] * len(output)
+                # Safely extract timestamp from query_string
+                timestamps = pattern.findall(query_string)
+                if len(timestamps) >= 2:
+                    timeadded = timestamps[1]
+                elif len(timestamps) == 1:
+                    timeadded = timestamps[0]
+                else:
+                    # Fallback: use current time or empty string
+                    timeadded = ""
+                output["timeadded"] = [timeadded] * len(output)
                 return output
             elif mode == "timelinevol" or "timelinevolraw" or "timelinetone" or "timelinetone" or "timelinelang" or "timelinesourcecountry":
                 return pd.DataFrame(
