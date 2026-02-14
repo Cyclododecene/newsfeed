@@ -3,11 +3,7 @@ import os
 
 setup(
     name="newsfeed",
-<<<<<<< HEAD
-    version="0.1.5",
-=======
     version="0.1.7",
->>>>>>> main
     keywords="GDELT NewsFeed",
     long_description=open(os.path.join(os.path.dirname(__file__),
                                        'README.md')).read(),
@@ -41,8 +37,4 @@ setup(
         "Operating System :: OS Independent",
     ],
     python_requires=">=3.9",
-<<<<<<< HEAD
 )
-=======
-)
->>>>>>> main
