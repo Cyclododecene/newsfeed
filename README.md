@@ -11,7 +11,7 @@ Newsfeed based on GDELT Project
 ### Installation
 
 ```shell
-conda create -n newsfeed python=3.7
+conda create -n newsfeed python=3.11
 python setup install
 ```
 
