@@ -333,3 +333,9 @@ Would you like me to dig deeper? For example:
 • Download full text of certain articles
 • Look at specific event types in detail
 ``` 
+
+Another example of the SKILL with Claude Code: 
+
+<center>
+    <img src="https://32cf906.webp.li/2026/02/example_with_skills.png" alt="Example of using SKILL with Claude Code" width="600"/>
+</center>
