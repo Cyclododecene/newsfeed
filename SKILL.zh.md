@@ -1,7 +1,7 @@
 ---
 name: newsfeed
 description: 查询 GDELT 项目（全球事件、语言和语调数据库）的 API 和数据库，获取新闻文章、事件和实体数据。适用于处理全球新闻数据集、事件提取、时间线查询或访问 GDELT 数据库。
-version: 0.1.4
+version: 0.1.7
 ---
 
 # Newsfeed - GDELT 数据查询

@@ -1,7 +1,7 @@
 ---
 name: newsfeed
 description: Query GDELT Project (Global Database of Events, Language, and Tone) APIs and databases for news articles, events, and entity data. Use when working with global news datasets, event extraction, timeline queries, or GDELT database access.
-version: 0.1.4
+version: 0.1.7
 ---
 
 # Newsfeed - GDELT Data Access
