@@ -12,7 +12,7 @@ def generate_header():
     return header
 
 
-# original code for newspaper3k and internet archive: https://github.com/johnbumgarner/newspaper3_usage_overview
+# original code for newspaper4k and internet archive: https://newspaper4k.readthedocs.io/en/latest/
 def _get(url):
     config = Config()
     config.browser_user_agent = generate_header()["User-Agent"]

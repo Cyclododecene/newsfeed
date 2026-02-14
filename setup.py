@@ -3,7 +3,7 @@ import os
 
 setup(
     name="newsfeed",
-    version="0.1.7",
+    version="0.1.7.1",
     keywords="GDELT NewsFeed",
     long_description=open(os.path.join(os.path.dirname(__file__),
                                        'README.md')).read(),
@@ -17,7 +17,7 @@ setup(
         "pandas>=2.3.3",
         "requests>=2.22.0",
         "tqdm>=4.67.1",
-        "newspaper3k>=0.2.8",
+        "newspaper4k>=0.9.4.1",
         "lxml>=4.4.2",
         "lxml-html-clean>=0.4.3",
         "beautifulsoup4>=4.14.3",

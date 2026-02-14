@@ -16,6 +16,8 @@ pandas = ">=2.3.3,<3"
 tqdm = ">=4.67.1,<5"
 requests = ">=2.32.5,<3"
 lxml = ">=6.0.2,<7"
-newspaper3k = ">=0.2.8,<0.3"
 lxml-html-clean = ">=0.4.3,<0.5"
 tenacity = ">=9.1.2,<10"
+
+[pypi-dependencies]
+newspaper4k = ">=0.9.4.1"

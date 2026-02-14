@@ -258,7 +258,7 @@ gdelt_v3_gfg_result = gdelt_v3_gfg.query()
 
 ### Utilities
 
-Full-text downloader (based on [`newspaper3k`](https://github.com/codelucas/newspaper) and [Wayback Machine](https://archive.org/help/wayback_api.php))
+Full-text downloader (based on [`newspaper4k`](https://newspaper4k.readthedocs.io/en/latest/) and [Wayback Machine](https://archive.org/help/wayback_api.php))
 
 ```python
 from newsfeed.utils import fulltext as ft
