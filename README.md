@@ -51,6 +51,97 @@ The URL encoding reference: [url encode](https://www.eso.org/~ndelmott/url_encod
 
 ## HOWTO
 
+### CLI Usage
+
+The CLI tool provides a convenient way to query GDELT databases and download full text articles from the command line.
+
+#### Basic Database Query
+
+```bash
+python -m newsfeed --db <DATABASE> --version <VERSION> --start <START_DATE> --end <END_DATE> [--format <FORMAT>] [--output <OUTPUT_FILE>]
+```
+
+**Parameters:**
+
+| Parameter | Description | Required | Values | Example |
+|-----------|-------------|----------|--------|---------|
+| `--db` | Database type | Yes | EVENT, GKG, MENTIONS | EVENT |
+| `--version` | Database version | Yes | V1, V2 | V2 |
+| `--start` | Start date | Yes | V1: YYYY-MM-DD, V2: YYYY-MM-DD-HH-MM-SS | 2021-01-01 or 2021-01-01-00-00-00 |
+| `--end` | End date | Yes | V1: YYYY-MM-DD, V2: YYYY-MM-DD-HH-MM-SS | 2021-01-02 or 2021-01-02-00-00-00 |
+| `--format` | Output format | No | csv, json (default: csv) | json |
+| `--output` | Output filename | No | Any filename (auto-generated if not specified) | results.csv |
+
+**Examples:**
+
+1. **Query Events V2 Database:**
+   ```bash
+   python -m newsfeed --db EVENT --version V2 --start 2021-01-01-00-00-00 --end 2021-01-02-00-00-00
+   ```
+
+2. **Query GKG V1 Database:**
+   ```bash
+   python -m newsfeed --db GKG --version V1 --start 2021-01-01 --end 2021-01-02
+   ```
+
+3. **Query Mentions V2 with JSON Output:**
+   ```bash
+   python -m newsfeed --db MENTIONS --version V2 --start 2021-01-01-00-00-00 --end 2021-01-02-00-00-00 --format json
+   ```
+
+4. **Specify Output Filename:**
+   ```bash
+   python -m newsfeed --db EVENT --version V2 --start 2021-01-01-00-00-00 --end 2021-01-02-00-00-00 --output my_events.csv
+   ```
+
+#### Full Text Download
+
+Download complete article text from URLs in standalone mode or after database queries.
+
+**Standalone Mode:**
+
+1. **Download from a Single URL:**
+   ```bash
+   python -m newsfeed --fulltext --url "https://example.com/article" --output article.json
+   ```
+
+2. **Download from URL List File** (one URL per line):
+   ```bash
+   python -m newsfeed --fulltext --input urls.txt --output fulltexts.csv
+   ```
+
+3. **Download from CSV File:**
+   ```bash
+   python -m newsfeed --fulltext --input results.csv --url-column SOURCEURL --output with_fulltext.csv
+   ```
+
+**Query Mode + Full Text Download:**
+
+Query database and automatically download full text:
+
+```bash
+python -m newsfeed --db EVENT --version V2 --start 2021-01-01-00-00-00 --end 2021-01-02-00-00-00 --download-fulltext
+```
+
+This will:
+1. Query GDELT Events database
+2. Extract unique URLs from SOURCEURL column
+3. Download full text for each article
+4. Add full text to FULLTEXT column
+5. Export CSV/JSON file with full text
+
+**Full Text Download Parameters:**
+
+| Parameter | Description | Mode | Default |
+|-----------|-------------|------|---------|
+| `--fulltext` | Enable full text download mode | Standalone | - |
+| `--download-fulltext` | Download full text after query | Query | False |
+| `--url` | Single URL | Standalone | - |
+| `--input` | Input file (txt or csv) | Standalone | - |
+| `--url-column` | URL column name in CSV | Both | SOURCEURL |
+| `--fulltext-column` | Full text column name in output | Query | FULLTEXT |
+| `--format` | Output format (csv, json, txt) | Both | csv |
+
 ### APIs
 
 #### For Article query:
@@ -174,3 +265,71 @@ from newsfeed.utils import fulltext as ft
 art = ft.download(url="https://english.news.cn/20220205/a4e93df9162e4053af64c392b5f5bfec/c.html")
 print("full text: \n {}".format(art.text))
 ```
+
+
+## ONE MORE THING
+
+Please note that now we support the [`SKILLS`](https://github.com/agentskills/agentskills). You can check the details in [SKILL.md](skills/newsfeed/SKILL.md) and [SKILL.zh.md](skills/newsfeed/SKILL.zh.md).
+
+Here is an example of how to use the SKILL with OpenClaw (GLM-4.7) with querying news events related to China and the UK from GDELT Event database:
+
+```
+User: Help me find news reports related to China and the UK from the GDELT Event since 2026.
+
+OpenClaw [Feb 14, 2026 at 17:40:39]: 
+I am downloading all event data from the GDELT database from January to February 14, 2026. This query involves files of 4320 time slices, and the download and processing will take some time (estimated 15-20 minutes).
+
+
+OpenClaw [Feb 14, 2026 at 17:51:51]: 
+Query complete!
+...📊 Summary of China-UK Related News Events
+
+Total Events: 1,599 China-UK related events
+Data Size: Full dataset 440MB, filtered down to 672KB
+Time Range: January 31 - February 14, 2026
+
+📅 Date Distribution (Partial)
+| Date       | Event Count      |
+| ---------- | ---------------- |
+| 2026-01-01 | 2 events         |
+| 2026-01-02 | 8 events         |
+| 2026-01-05 | 19 events        |
+| 2026-01-10 | 23 events        |
+| 2026-01-12 | 38 events (peak) |
+🎯 Top Event Types (Top 5)
+
+1. Code 42: 252 events
+2. Code 43: 217 events
+3. Code 36: 181 events
+4. Code 40: 92 events
+5. Code 20: 79 events
+💭 Sentiment Analysis
+
+• Average Tone Score: -1.27 (overall slightly negative)
+• Goldstein Scale: Average 2.03 (moderate impact level)
+• Most Negative Event: Tone score -10.42
+• **Most Positive Event**: Tone score 12.56
+
+🏛️ Main Actors
+
+China Side:
+
+• CHINA: 482 occurrences
+• CHINESE: 159 occurrences
+• BEIJING: 108 occurrences
+UK Side:
+
+• UNITED KINGDOM: 449 occurrences
+• BRITISH: 176 occurrences
+• LONDON: 59 occurrences
+
+📁 File Locations
+
+• Filtered Data: /tmp/china_uk_events.csv (1,599 events)
+• Full Raw Data: /tmp/events_full.csv (440MB)
+Would you like me to dig deeper? For example:
+
+• Analyze events from specific dates
+• Download full text of certain articles
+• Look at specific event types in detail
+``` 
