@@ -1,7 +1,7 @@
 ---
 name: newsfeed
 description: Comprehensive news aggregator that fetches, filter, and deeply analyze real-time/historical content from the GDELT Project (Global Database of Events, Language, and Tone) databases for news articles, events, and entity data. Use when user are working with global news, historical news report, global event extraction, or GDELT database access.
-version: 0.1.7.1
+version: 0.1.7.2
 ---
 
 # Newsfeed - GDELT Data Access
@@ -13,6 +13,7 @@ Fetch real-time/historical news from the **GDELT Project** (Global Database of E
 ## When to Use
 
 Use this skill when you need to:
+- Analyse global news by keywords, themes, actors, or locations
 - Query global news articles by date range
 - Access GDELT Events, Mentions, and Global Knowledge Graph (GKG) databases
 - Perform timeline analysis of news events
@@ -26,7 +27,7 @@ To use this skill, set up your environment with the following commands:
 1. Create and activate a new or existing Python environment (Python 3.10+ recommended)
 2. Install `newsfeed` package:
    ```bash
-   pip install newsfeed==0.1.7.1
+   pip install newsfeed==0.1.7.2
    ```
 
 Or just download from source code:
@@ -39,15 +40,14 @@ Or just download from source code:
 
 ## Common Patterns
 
-1. **Event Search**: Query GDELT Events Database for events based on date range and version
-2. **Mentions Search**: Query GDELT Mentions Database for media mentions of events
-3. **Global Knowledge Graph Search**: Query GDELT GKG for themes, locations, and relationships
-4. **Full-Text Download**: Download complete article content from URLs
-5. **Export Results**: Save query results to JSON or CSV for further analysis
+1. Scenario 1: Search news by keywords/themes, e.g. `python script/script.py --scenario search-topics --days 1 --keywords "AI,GPT,LLM"` Query news about AI and LLM in the past 1 day and summarize the top themes, locations, and actors.
+2. Scenario 2: View bialteral events between two countries, e.g. `python script/script.py --scenario bilateral-events --days 7 --country1 USA --country2 CHN` Query events between USA and China in the past 7 days and summarize the event types, sentiment, and main actors.
+3. Scenario 3: View event media mentions and sentiment: e.g. `python skills/script.py --scenario event-mentions --event-id 12345` Query media mentions of event with ID 12345 and summarize the sentiment and source distribution.
 
 ## CLI Usage (Recommended)
 
 The primary way to interact with GDELT databases is through the CLI interface.
+
 
 ### Basic Database Query
 
