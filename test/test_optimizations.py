@@ -59,9 +59,8 @@ def test_cache_manager():
     print("✓ Cache load successful")
     
     # Test cache stats
-    stats = cache.get_stats()
-    assert stats['total_queries'] > 0
-    assert stats['cache_hits'] > 0
+    stats = cache.get_cache_size()
+    assert stats['num_files'] > 0
     print(f"✓ Cache stats: {stats}")
 
 
@@ -96,13 +95,10 @@ def test_incremental_manager():
     assert "file4.csv" in new_files
     print("✓ Incremental query working")
     
-    # Test query history
-    history = inc.get_query_history(
-        db_type="TEST",
-        version="V1"
-    )
-    assert len(history) > 0
-    print(f"✓ Query history retrieved: {len(history)} entries")
+    # Test query history stats
+    stats = inc.get_history_stats()
+    assert stats['total_queries'] > 0
+    print(f"✓ History stats retrieved: {stats}")
 
 
 def test_async_download():
@@ -313,8 +309,8 @@ def test_cache_clear():
     test_data = pd.DataFrame({'a': [1, 2, 3]})
     cache.set(test_data, db_type="TEST", version="V1", start_date="20210101", end_date="20210102")
     
-    # Clear cache
-    cache.clear()
+    # Clear specific cache entry
+    cache.clear(db_type="TEST", version="V1", start_date="20210101", end_date="20210102")
     
     # Verify cache is cleared
     loaded = cache.get(db_type="TEST", version="V1", start_date="20210101", end_date="20210102")
