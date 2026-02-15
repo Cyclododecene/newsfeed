@@ -44,9 +44,24 @@ Or just download from source code:
 2. Scenario 2: View bialteral events between two countries, e.g. `python script/script.py --scenario bilateral-events --days 7 --country1 USA --country2 CHN` Query events between USA and China in the past 7 days and summarize the event types, sentiment, and main actors.
 3. Scenario 3: View event media mentions and sentiment: e.g. `python skills/script.py --scenario event-mentions --event-id 12345` Query media mentions of event with ID 12345 and summarize the sentiment and source distribution.
 
-## CLI Usage (Recommended)
+## Tools for Scenario (Recommended)
 
-The primary way to interact with GDELT databases is through the CLI interface.
+```python
+# Senario 1: Search news by keywords/themes
+ 
+python script/script.py --scenario search-topics --days 1 --keywords "{keywords}"
+
+# Scenario 2: View bialteral events between two countries
+python script/script.py --scenario bilateral-events --days 7 --country1 {country1} --country2 {country2}
+
+# Scenario 3: View event media mentions and sentiment
+python skills/script.py --scenario event-mentions --event-id {event_id}
+```
+
+
+## CLI Usage
+
+If the requirement does not fit the preset scenarios, the primary way to interact with GDELT databases is through the CLI interface.
 
 
 ### Basic Database Query
