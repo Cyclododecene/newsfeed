@@ -163,6 +163,24 @@ class AsyncDownloader:
         """
         async with semaphore:
             try:
+                # First, check if URL exists and reconstruct if needed
+                from urllib.parse import urlparse
+                
+                # Reconstruct URL (similar to fulltext.py's reconstruct_url)
+                url_root = urlparse(url).scheme + "://" + urlparse(url).netloc
+                try:
+                    async with session.get(
+                        url_root,
+                        headers=self._generate_header(),
+                        timeout=aiohttp.ClientTimeout(total=10)
+                    ) as root_response:
+                        if root_response.status == 200:
+                            final_url = root_response.url
+                            url = final_url + urlparse(url).path + urlparse(url).params + urlparse(url).query + urlparse(url).fragment
+                except:
+                    pass  # Use original URL if reconstruction fails
+                
+                # Try to download the article
                 async with session.get(
                     url,
                     headers=self._generate_header(),
@@ -173,13 +191,21 @@ class AsyncDownloader:
                     
                     html_content = await response.text()
                     
-                    # Extract text using newspaper3k (needs to run in thread)
+                    # Extract text using newspaper3k (needs to run in thread pool)
                     from newspaper import Article
-                    article = Article(url)
-                    article.set_html(html_content)
-                    article.parse()
+                    import concurrent.futures
                     
-                    return url, article.text, None
+                    def parse_article():
+                        article = Article(url)
+                        article.set_html(html_content)
+                        article.parse()
+                        return article.text
+                    
+                    # Run CPU-bound parsing in thread pool
+                    loop = asyncio.get_event_loop()
+                    text = await loop.run_in_executor(None, parse_article)
+                    
+                    return url, text, None
                     
             except asyncio.TimeoutError:
                 return url, None, "Timeout"

@@ -110,24 +110,50 @@ def download_fulltext_from_urls(urls: list, use_async: bool = False, show_progre
         
         # Convert to expected format
         results = []
-        for article in articles:
-            if hasattr(article, 'text') and article.text:
-                results.append({
-                    'url': article.url if hasattr(article, 'url') else '',
-                    'title': article.title if hasattr(article, 'title') else '',
-                    'text': article.text,
-                    'publish_date': article.publish_date if hasattr(article, 'publish_date') else '',
-                    'authors': article.authors if hasattr(article, 'authors') else [],
-                    'keywords': article.keywords if hasattr(article, 'keywords') else [],
-                    'top_image': article.top_image if hasattr(article, 'top_image') else '',
-                    'success': True
-                })
-            else:
-                results.append({'url': getattr(article, 'url', ''), 'success': False})
+        
+        # articles is a dict {url: full_text} when using async
+        if isinstance(articles, dict):
+            for url, text in articles.items():
+                if text and text.strip():
+                    results.append({
+                        'url': url,
+                        'title': '',
+                        'text': text,
+                        'publish_date': '',
+                        'authors': [],
+                        'keywords': [],
+                        'top_image': '',
+                        'success': True
+                    })
+                else:
+                    results.append({'url': url, 'success': False})
+        else:
+            # Handle case where articles is a list (shouldn't happen with async)
+            for article in articles:
+                if hasattr(article, 'text') and article.text:
+                    results.append({
+                        'url': article.url if hasattr(article, 'url') else '',
+                        'title': article.title if hasattr(article, 'title') else '',
+                        'text': article.text,
+                        'publish_date': article.publish_date if hasattr(article, 'publish_date') else '',
+                        'authors': article.authors if hasattr(article, 'authors') else [],
+                        'keywords': article.keywords if hasattr(article, 'keywords') else [],
+                        'top_image': article.top_image if hasattr(article, 'top_image') else '',
+                        'success': True
+                    })
+                else:
+                    results.append({'url': getattr(article, 'url', ''), 'success': False})
         
         # Add errors
         for error in errors:
-            results.append({'url': error.get('url', ''), 'success': False})
+            # Handle both tuple and dict error formats
+            if isinstance(error, dict):
+                url = error.get('url', '')
+            elif isinstance(error, tuple) and len(error) > 0:
+                url = error[0]
+            else:
+                url = ''
+            results.append({'url': url, 'success': False})
         
         return results
     else:
@@ -512,15 +538,43 @@ Examples:
                 # Download full text
                 fulltext_results = download_fulltext_from_urls(urls, use_async=args.use_async, show_progress=True)
                 
+                # Debug: Show download statistics
+                successful_downloads = [item for item in fulltext_results if item.get('success', False)]
+                failed_downloads = [item for item in fulltext_results if not item.get('success', False)]
+                print(f"\nFull text download summary:")
+                print(f"  Successful: {len(successful_downloads)}")
+                print(f"  Failed: {len(failed_downloads)}")
+                
+                if failed_downloads:
+                    print(f"\n  Sample failed URLs (first 5):")
+                    for item in failed_downloads[:5]:
+                        print(f"    - {item.get('url', 'unknown')}")
+                
                 # Create mapping from URL to full text
                 url_to_text = {}
                 for item in fulltext_results:
                     if item.get('success') and item.get('text'):
                         url_to_text[item['url']] = item['text']
                 
+                print(f"\n  URLs in mapping: {len(url_to_text)}")
+                print(f"  URLs in results[url_column]: {results[url_column].notna().sum()}")
+                
                 # Add full text column
                 results[args.fulltext_column] = results[url_column].map(url_to_text)
-                print(f"Added full text to {len(url_to_text)} records")
+                non_empty_count = results[args.fulltext_column].notna().sum()
+                print(f"\nAdded full text to {non_empty_count} records")
+                
+                if non_empty_count == 0:
+                    print("\n⚠️  WARNING: No full text was successfully downloaded!")
+                    print("   This could be due to:")
+                    print("   - Website blocking automated downloads")
+                    print("   - Invalid or expired URLs")
+                    print("   - Network issues")
+                    print("   - Article extraction failures")
+                    print("\n   You can try:")
+                    print("   - Using fewer URLs (--limit parameter)")
+                    print("   - Using synchronous mode (remove --async)")
+                    print("   - Adding delays between requests")
         
         # Export results
         print(f"\nExporting results to {args.output}...")
