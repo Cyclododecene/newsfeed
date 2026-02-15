@@ -18,6 +18,9 @@ requests = ">=2.32.5,<3"
 lxml = ">=6.0.2,<7"
 lxml-html-clean = ">=0.4.3,<0.5"
 tenacity = ">=9.1.2,<10"
-
-[pypi-dependencies]
+aiohttp = "*"
+aiofiles = "*"
+pyarrow = "*"
+joblib = "*"
+pytest = ">=9.0.2,<10"
 newspaper4k = ">=0.9.4.1"

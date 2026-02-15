@@ -2,6 +2,7 @@
 author: Terence Junjie LIU
 start_date: Mon 27 Dec, 2021
 modified: Sat 05 Jan, 2022
+updated: 2026 - Performance optimizations
 """
 import time
 import tqdm
@@ -11,11 +12,14 @@ from lxml import html
 import multiprocessing
 from datetime import datetime, timedelta, timezone
 from fake_useragent import UserAgent
-
+from typing import Optional
 from tenacity import retry, stop_after_attempt
 
-import warnings
+from newsfeed.utils.cache import get_cache_manager
+from newsfeed.utils.incremental import get_incremental_manager
+from newsfeed.utils.async_downloader import run_async_download
 
+import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
@@ -46,10 +50,22 @@ class EventV1(object):
     def __init__(self,
                  start_date: str = "2020-01-01",
                  end_date: str = "2021-12-31",
-                 proxy: dict = None):
+                 proxy: dict = None,
+                 use_cache: bool = False,
+                 use_incremental: bool = False,
+                 force_redownload: bool = False,
+                 use_async: bool = False,
+                 output_format: str = "csv"):
         self.start_date = "".join(start_date.split("-"))
         self.end_date = "".join(end_date.split("-"))
         self.proxy = proxy
+        self.use_cache = use_cache
+        self.use_incremental = use_incremental
+        self.force_redownload = force_redownload
+        self.use_async = use_async
+        self.output_format = output_format
+        self.cache_manager = get_cache_manager() if use_cache else None
+        self.incremental_manager = get_incremental_manager() if use_incremental else None
 
     def _generate_header(self):
         ua = UserAgent()
@@ -64,13 +80,12 @@ class EventV1(object):
         ]
         return download_url_list
 
-    # tp = pd.read_csv('Check1_900.csv', sep='\t', iterator=True, chunksize=1000)
     @retry(stop=stop_after_attempt(3))
     def _download_file(self, url: str = "20200101.export.CSV.zip"):
-        '''
+        """
         fixed: add retry mechanism
         fixed: replace write_bad_lines with on_bad_lines
-        '''
+        """
         download_url = self.base_url + url
         time.sleep(0.0005)
         try:
@@ -82,15 +97,12 @@ class EventV1(object):
                 return "GDELT does not contains this url: {}".format(url)
 
             else:
-                #response_text = io.BytesIO(response.content)
                 response_df = pd.read_csv(download_url,
                                           compression="zip",
                                           sep="\t",
                                           header=None,
                                           on_bad_lines='skip',
                                           low_memory=False)
-                #response_text.flush()
-                #response_text.close()
                 return response_df
 
         except Exception as e:
@@ -98,24 +110,91 @@ class EventV1(object):
 
     def query(self):
         download_url_list = self._query_list()
-        pool = multiprocessing.Pool(self.cpu_num)
-        try:
-            print("[+] Downloading... [startdate={} & enddate={}]".format(
-                self.start_date, self.end_date))
-            downloaded_dfs = list(
-                tqdm.tqdm(pool.imap_unordered(self._download_file,
-                                              download_url_list),
-                          total=len(download_url_list)))
-            pool.close()
-            pool.terminate()
-            pool.join()
-            results = pd.concat(downloaded_dfs)
-            del downloaded_dfs
-            results.reset_index(drop=True, inplace=True)
-            results.columns = self.columns_name
-            return results
-        except Exception as e:
-            return e
+        
+        # Check cache first
+        if self.use_cache and not self.force_redownload:
+            cached_data = self.cache_manager.get(
+                db_type="EVENT",
+                version="V1",
+                start_date=self.start_date,
+                end_date=self.end_date
+            )
+            if cached_data is not None:
+                print("[+] Loading from cache...")
+                return cached_data
+        
+        # Apply incremental query
+        if self.use_incremental and not self.force_redownload:
+            all_files = download_url_list
+            new_files = self.incremental_manager.get_new_files(
+                all_files,
+                db_type="EVENT",
+                version="V1",
+                start_date=self.start_date,
+                end_date=self.end_date
+            )
+            if len(new_files) == 0:
+                print("[+] No new files to download (incremental mode)")
+                return pd.DataFrame(columns=self.columns_name)
+            download_url_list = new_files
+        
+        # Use async download if enabled
+        if self.use_async:
+            print("[+] Using async download...")
+            downloaded_dfs, errors = run_async_download(
+                self.base_url,
+                download_url_list,
+                max_concurrent=20,
+                proxy=self.proxy
+            )
+            if errors:
+                print(f"[+] {len(errors)} files failed to download")
+        else:
+            # Original synchronous download
+            pool = multiprocessing.Pool(self.cpu_num)
+            try:
+                print("[+] Downloading... [startdate={} & enddate={}]".format(
+                    self.start_date, self.end_date))
+                downloaded_dfs = list(
+                    tqdm.tqdm(pool.imap_unordered(self._download_file,
+                                                  download_url_list),
+                              total=len(download_url_list)))
+                pool.close()
+                pool.terminate()
+                pool.join()
+            except Exception as e:
+                return e
+        
+        # Process downloaded data
+        downloaded_dfs = [df for df in downloaded_dfs if isinstance(df, pd.DataFrame)]
+        if not downloaded_dfs:
+            print("[+] No valid data downloaded")
+            return pd.DataFrame(columns=self.columns_name)
+        
+        results = pd.concat(downloaded_dfs)
+        del downloaded_dfs
+        results.reset_index(drop=True, inplace=True)
+        results.columns = self.columns_name
+        
+        # Save to cache if enabled
+        if self.use_cache:
+            self.cache_manager.set(results,
+                              db_type="EVENT",
+                              version="V1",
+                              start_date=self.start_date,
+                              end_date=self.end_date)
+        
+        # Save incremental history if enabled
+        if self.use_incremental:
+            self.incremental_manager.save_query_history(
+                download_url_list,
+                db_type="EVENT",
+                version="V1",
+                start_date=self.start_date,
+                end_date=self.end_date
+            )
+        
+        return results
 
     def query_nowtime(self, date: str = None):
         # by default the self.start_date variable is None, then the func will query for the nearest files
@@ -177,12 +256,24 @@ class EventV2(object):
                  end_date: str = "2021-12-31-00-00-00",
                  table: str = "events",
                  translation: bool = False,
-                 proxy: dict = None):
+                 proxy: dict = None,
+                 use_cache: bool = False,
+                 use_incremental: bool = False,
+                 force_redownload: bool = False,
+                 use_async: bool = False,
+                 output_format: str = "csv"):
         self.start_date = "".join(start_date.split("-"))
         self.end_date = "".join(end_date.split("-"))
         self.table = table
         self.translation = translation
         self.proxy = proxy
+        self.use_cache = use_cache
+        self.use_incremental = use_incremental
+        self.force_redownload = force_redownload
+        self.use_async = use_async
+        self.output_format = output_format
+        self.cache_manager = get_cache_manager() if use_cache else None
+        self.incremental_manager = get_incremental_manager() if use_incremental else None
 
     def _generate_header(self):
         ua = UserAgent()
@@ -245,15 +336,12 @@ class EventV2(object):
                 return "GDELT does not contains this url: {}".format(url)
 
             else:
-                #response_text = io.BytesIO(response.content)
                 response_df = pd.read_csv(download_url,
                                           compression="zip",
                                           sep="\t",
                                           header=None,
                                           on_bad_lines='skip',
                                           low_memory=False)
-                #response_text.flush()
-                #response_text.close()
                 return response_df
 
         except Exception as e:
@@ -261,31 +349,110 @@ class EventV2(object):
 
     def query(self):
         download_url_list = self._query_list()
-        pool = multiprocessing.Pool(self.cpu_num)
-        try:
-            print("[+] Downloading... [startdate={} & enddate={}]".format(
-                self.start_date, self.end_date))
-            downloaded_dfs = list(
-                tqdm.tqdm(pool.imap_unordered(self._download_file,
-                                              download_url_list),
-                          total=len(download_url_list)))
-            pool.close()
-            pool.terminate()
-            pool.join()
-            results = [
-                data for data in downloaded_dfs if type(data) == pd.DataFrame
-            ]  # remove non DataFrame (e.g. Error)
-            results = pd.concat(results)
-            del downloaded_dfs
-            results.reset_index(drop=True, inplace=True)
+        
+        # Check cache first
+        if self.use_cache and not self.force_redownload:
+            cached_data = self.cache_manager.get(
+                db_type="EVENT",
+                version="V2",
+                start_date=self.start_date,
+                end_date=self.end_date,
+                table_type=self.table,
+                translation=self.translation
+            )
+            if cached_data is not None:
+                print("[+] Loading from cache...")
+                return cached_data
+        
+        # Apply incremental query
+        if self.use_incremental and not self.force_redownload:
+            all_files = download_url_list
+            new_files = self.incremental_manager.get_new_files(
+                all_files,
+                db_type="EVENT",
+                version="V2",
+                start_date=self.start_date,
+                end_date=self.end_date,
+                table_type=self.table,
+                translation=self.translation
+            )
+            if len(new_files) == 0:
+                print("[+] No new files to download (incremental mode)")
+                if self.table == "events":
+                    return pd.DataFrame(columns=self.columns_name_events)
+                else:
+                    return pd.DataFrame(columns=self.columns_name_mentions)
+            download_url_list = new_files
+        
+        # Use async download if enabled
+        if self.use_async:
+            print("[+] Using async download...")
+            downloaded_dfs, errors = run_async_download(
+                self.base_url,
+                download_url_list,
+                max_concurrent=20,
+                proxy=self.proxy
+            )
+            if errors:
+                print(f"[+] {len(errors)} files failed to download")
+        else:
+            # Original synchronous download
+            pool = multiprocessing.Pool(self.cpu_num)
+            try:
+                print("[+] Downloading... [startdate={} & enddate={}]".format(
+                    self.start_date, self.end_date))
+                downloaded_dfs = list(
+                    tqdm.tqdm(pool.imap_unordered(self._download_file,
+                                                  download_url_list),
+                              total=len(download_url_list)))
+                pool.close()
+                pool.terminate()
+                pool.join()
+            except Exception as e:
+                return e
+        
+        # Process downloaded data
+        downloaded_dfs = [df for df in downloaded_dfs if isinstance(df, pd.DataFrame)]
+        if not downloaded_dfs:
+            print("[+] No valid data downloaded")
             if self.table == "events":
-                results.columns = self.columns_name_events
-                return results
+                return pd.DataFrame(columns=self.columns_name_events)
             else:
-                results.columns = self.columns_name_mentions
-                return results
-        except Exception as e:
-            return e
+                return pd.DataFrame(columns=self.columns_name_mentions)
+        
+        results = pd.concat(downloaded_dfs)
+        del downloaded_dfs
+        results.reset_index(drop=True, inplace=True)
+        
+        # Set columns based on table type
+        if self.table == "events":
+            results.columns = self.columns_name_events
+        else:
+            results.columns = self.columns_name_mentions
+        
+        # Save to cache if enabled
+        if self.use_cache:
+            self.cache_manager.set(results,
+                              db_type="EVENT",
+                              version="V2",
+                              start_date=self.start_date,
+                              end_date=self.end_date,
+                              table_type=self.table,
+                              translation=self.translation)
+        
+        # Save incremental history if enabled
+        if self.use_incremental:
+            self.incremental_manager.save_query_history(
+                download_url_list,
+                db_type="EVENT",
+                version="V2",
+                start_date=self.start_date,
+                end_date=self.end_date,
+                table_type=self.table,
+                translation=self.translation
+            )
+        
+        return results
 
     def query_nowtime(self, date: str = None):
         # by default the self.start_date variable is None, then the func will query for the nearest files
