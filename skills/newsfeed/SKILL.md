@@ -1,14 +1,14 @@
 ---
 name: newsfeed
-description: Query GDELT Project (Global Database of Events, Language, and Tone) APIs and databases for news articles, events, and entity data. Use when working with global news datasets, event extraction, timeline queries, or GDELT database access.
-version: 0.1.7
+description: Comprehensive news aggregator that fetches, filter, and deeply analyze real-time/historical content from the GDELT Project (Global Database of Events, Language, and Tone) databases for news articles, events, and entity data. Use when user are working with global news, historical news report, global event extraction, or GDELT database access.
+version: 0.1.7.1
 ---
 
 # Newsfeed - GDELT Data Access
 
 ## Overview 
 
-Query and retrieve data from the **GDELT Project** (Global Database of Events, Language, and Tone) through CLI tools and Python APIs.
+Fetch real-time/historical news from the **GDELT Project** (Global Database of Events, Language, and Tone) through CLI tools and Python APIs.
 
 ## When to Use
 
@@ -26,7 +26,7 @@ To use this skill, set up your environment with the following commands:
 1. Create and activate a new or existing Python environment (Python 3.10+ recommended)
 2. Install `newsfeed` package:
    ```bash
-   pip install newsfeed==0.1.7
+   pip install newsfeed==0.1.7.1
    ```
 
 Or just download from source code:

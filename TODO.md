@@ -29,12 +29,6 @@
   - Supports all database types (EVENT, GKG, MENTIONS)
   - Supports async fulltext downloads
 
-### 📝 Future Work (Optional)
-- [ ] Add comprehensive unit tests for cache, incremental, and async features
-- [ ] Add integration tests for optimized database queries
-- [ ] Performance benchmarking and optimization
-- [ ] Add data compression (Parquet) support to output format
-- [ ] Add caching for API queries
 
 ## 🚀 Planned Data Analysis and Visualization Features
 

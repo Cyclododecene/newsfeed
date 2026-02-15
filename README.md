@@ -484,6 +484,10 @@ python test/test_optimizations.py
 python test/test_api.py
 ```
 
+## Use the package with your Agent
+
+Place check that we are now provide a demo [SKILL](./skills/newsfeed/) for your agent to use the newsfeed package. You can use the provided `SKILL.md` as a template to create your own skill for your agents.
+
 ## 📚 Documentation
 
 For detailed information:
