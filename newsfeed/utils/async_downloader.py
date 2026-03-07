@@ -77,16 +77,33 @@ class AsyncDownloader:
                     
                     # Read content
                     content = await response.read()
-                    
-                    # Parse CSV from zip file
-                    df = pd.read_csv(
-                        io.BytesIO(content),
-                        compression="zip",
-                        sep="\t",
-                        header=None,
-                        on_bad_lines='skip',
-                        low_memory=False
-                    )
+
+                    # Auto-detect format from URL
+                    if url.endswith(".json.gz") or url.endswith(".jsonl.gz"):
+                        df = pd.read_json(
+                            io.BytesIO(content),
+                            compression="gzip",
+                            lines=True,
+                        )
+                    elif url.endswith(".gz"):
+                        df = pd.read_csv(
+                            io.BytesIO(content),
+                            compression="gzip",
+                            sep="\t",
+                            header=None,
+                            on_bad_lines="skip",
+                            low_memory=False,
+                        )
+                    else:
+                        # Default: zip-compressed TSV (GDELT standard)
+                        df = pd.read_csv(
+                            io.BytesIO(content),
+                            compression="zip",
+                            sep="\t",
+                            header=None,
+                            on_bad_lines="skip",
+                            low_memory=False,
+                        )
                     
                     return url, df, None
                     
@@ -175,8 +192,15 @@ class AsyncDownloader:
                         timeout=aiohttp.ClientTimeout(total=10)
                     ) as root_response:
                         if root_response.status == 200:
-                            final_url = root_response.url
-                            url = final_url + urlparse(url).path + urlparse(url).params + urlparse(url).query + urlparse(url).fragment
+                            final_url_str = str(root_response.url)
+                            parsed_orig = urlparse(url)
+                            reconstructed = final_url_str.rstrip('/')
+                            reconstructed += parsed_orig.path
+                            if parsed_orig.query:
+                                reconstructed += '?' + parsed_orig.query
+                            if parsed_orig.fragment:
+                                reconstructed += '#' + parsed_orig.fragment
+                            url = reconstructed
                 except:
                     pass  # Use original URL if reconstruction fails
                 
@@ -262,7 +286,8 @@ def run_async_download(
     max_concurrent: int = 20,
     timeout: int = 30,
     proxy: Optional[dict] = None,
-    show_progress: bool = True
+    show_progress: bool = True,
+    is_full_url: bool = False
 ) -> Tuple[List[pd.DataFrame], List[Tuple[str, str]]]:
     """
     Synchronous wrapper for async file download

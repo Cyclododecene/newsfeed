@@ -30,6 +30,12 @@
   - Supports async fulltext downloads
 
 
+## ✅ High-Priority Fixes (COMPLETED)
+
+- [x] **`output_format` implemented** (`newsfeed/utils/export.py`): Full export utility with CSV, JSON, JSONL, Parquet support. All DB classes (`EventV1`, `EventV2`, `GKGV1`, `GKGV2`) gain an `export(results, filepath)` convenience method.
+- [x] **`fulltext.py` URL bugs fixed** (`newsfeed/utils/fulltext.py`): `reconstruct_url` now correctly appends `?query` and `#fragment` separators; handles redirect failures gracefully. `check_url` now returns the actual HTTP status code (200) on success instead of `None`.
+- [x] **Async `.json.gz` support** (`newsfeed/utils/async_downloader.py`): `_download_single_file` auto-detects file format from URL extension (`.json.gz` → `pd.read_json(gzip)`, `.gz` → gzip CSV, everything else → zip TSV). Fixes `GEG` async download path.
+
 ## 🚀 Planned Data Analysis and Visualization Features
 
 ### Trend Analysis

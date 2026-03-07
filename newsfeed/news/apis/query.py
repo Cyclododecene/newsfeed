@@ -42,32 +42,114 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 def text_regex(str_1, str_2, newstring, text):
     reg = "%s(.*?)%s" % (str_1, str_2)
     r = re.compile(reg, re.DOTALL)
-    return (r.sub(newstring, text))
+    result = r.sub(newstring, text)
+    
+    # Check if substitution actually happened
+    if result == text:
+        raise ValueError(f"text_regex failed to find pattern '{str_1}' and '{str_2}' in query string. Text: {text[:200]}...")
+    
+    return result
+
+
+def replace_datetime_params(text, start_datetime, end_datetime):
+    """
+    Replace startdatetime and enddatetime parameters in query string.
+    
+    Args:
+        text: Original query string
+        start_datetime: New start datetime (e.g., "20211231000000")
+        end_datetime: New end datetime (e.g., "20211231010000")
+    
+    Returns:
+        Updated query string
+    """
+    # Replace startdatetime
+    text = re.sub(
+        r'&startdatetime=\d{14}',
+        f'&startdatetime={start_datetime}',
+        text
+    )
+    
+    # Replace enddatetime
+    text = re.sub(
+        r'&enddatetime=\d{14}',
+        f'&enddatetime={end_datetime}',
+        text
+    )
+    
+    return text
 
 
 def load_json(json_message,
               max_recursion_depth: int = 100,
               recursion_depth: int = 0):
+    """
+    Parse JSON with error handling and recovery.
+    
+    This function attempts to parse JSON and can handle some malformed JSON
+    by cleaning common issues (control characters, etc.).
+    """
     try:
-        result = json.loads(json_message)
-    except Exception as e:
+        # Ensure we're working with a string
+        if isinstance(json_message, bytes):
+            json_message = json_message.decode("utf-8")
 
+        # Empty response — nothing to parse
+        if not json_message or not json_message.strip():
+            raise ValueError("Empty response from API")
+
+        # Try to parse JSON directly first
+        result = json.loads(json_message)
+        return result
+        
+    except json.JSONDecodeError as e:
         if recursion_depth >= max_recursion_depth:
             raise ValueError(
-                "Max Recursion depth is reached. JSON can´t be parsed!")
-        # Find the offending character index:
-        idx_to_replace = int(e.pos)
-
-        # Remove the offending character:
-        if isinstance(json_message, bytes):
-            json_message.decode("utf-8")
-        json_message = list(json_message)
-        json_message[idx_to_replace] = ' '
-        new_message = ''.join(str(m) for m in json_message)
-        return load_json(json_message=new_message,
-                         max_recursion_depth=max_recursion_depth,
-                         recursion_depth=recursion_depth + 1)
-    return result
+                f"Failed to parse JSON after {max_recursion_depth} attempts. "
+                f"Last error: {e.msg} at line {e.lineno} column {e.colno}")
+        
+        # Get position information
+        error_pos = getattr(e, 'pos', None)
+        error_msg = str(e.msg)
+        
+        # Check if position is valid
+        if error_pos is None or error_pos < 0 or error_pos >= len(json_message):
+            # Position is invalid, raise error
+            raise ValueError(
+                f"JSON parsing error at line {e.lineno}, column {e.colno}: {error_msg}\n"
+                f"Position {error_pos} is invalid for string of length {len(json_message)}"
+            )
+        
+        # Try to fix common JSON issues
+        
+        # Strategy 1: Try replacing the problematic character with a space
+        if recursion_depth % 3 == 0:
+            json_list = list(json_message)
+            # Only replace if position is valid
+            if error_pos < len(json_list):
+                problematic_char = json_list[error_pos]
+                # Replace with space for common problematic characters
+                if ord(problematic_char) < 32:  # Control character
+                    json_list[error_pos] = ' '
+                elif problematic_char in ['\n', '\r', '\t']:
+                    json_list[error_pos] = ' '
+                new_message = ''.join(json_list)
+                return load_json(new_message, max_recursion_depth, recursion_depth + 1)
+        
+        # Strategy 2: Try removing the problematic character
+        if recursion_depth % 3 == 1:
+            new_message = json_message[:error_pos] + json_message[error_pos+1:]
+            return load_json(new_message, max_recursion_depth, recursion_depth + 1)
+        
+        # Strategy 3: Try truncating at error position
+        if recursion_depth % 3 == 2:
+            # Try to find the last valid JSON structure before error
+            # Look for closing braces/brackets
+            truncated = json_message[:error_pos].rstrip()
+            return load_json(truncated, max_recursion_depth, recursion_depth + 1)
+        
+    except Exception as e:
+        raise ValueError(f"Unexpected error while parsing JSON: {type(e).__name__}: {e}")
 
 
 def doc_query_search(query_string=None,
@@ -91,10 +173,25 @@ def doc_query_search(query_string=None,
         else:
             if mode == "artlist":
                 pattern = re.compile(r'\d{14}')
-                output = pd.DataFrame(
-                    load_json(
+                
+                # Parse JSON response
+                try:
+                    json_data = load_json(
                         response.text,
-                        max_recursion_depth=max_recursion_depth)["articles"])
+                        max_recursion_depth=max_recursion_depth)
+                except Exception as e:
+                    return ValueError(f"Failed to parse API response: {e}")
+                
+                # Check if 'articles' key exists
+                if "articles" not in json_data:
+                    return ValueError(f"API response missing 'articles' key. Response: {response.text[:200]}")
+                
+                # Create DataFrame from articles
+                try:
+                    output = pd.DataFrame(json_data["articles"])
+                except Exception as e:
+                    return ValueError(f"Failed to create DataFrame: {e}")
+                
                 # Safely extract timestamp from query_string
                 timestamps = pattern.findall(query_string)
                 if len(timestamps) >= 2:
@@ -106,9 +203,12 @@ def doc_query_search(query_string=None,
                     timeadded = ""
                 output["timeadded"] = [timeadded] * len(output)
                 return output
-            elif mode == "timelinevol" or "timelinevolraw" or "timelinetone" or "timelinetone" or "timelinelang" or "timelinesourcecountry":
-                return pd.DataFrame(
-                    load_json(response.text)["timeline"][0]["data"])
+            elif mode in ["timelinevol", "timelinevolraw", "timelinetone", "timelinelang", "timelinesourcecountry"]:
+                try:
+                    json_data = load_json(response.text, max_recursion_depth=max_recursion_depth)
+                    return pd.DataFrame(json_data["timeline"][0]["data"])
+                except Exception as e:
+                    return ValueError(f"Failed to parse timeline response: {e}")
 
 
 def geo_query_search(query_string:str = None,
@@ -150,15 +250,26 @@ def article_search(query_filter=None,
                                       query_filter.end_date,
                                       freq="{}min".format(time_range))
         ]
+        
+        # Validate date_range
+        if len(date_range) < 2:
+            return ValueError(f"Date range too short. Only {len(date_range)} time point(s) generated with time_range={time_range}min. Try increasing time_range parameter or extending start/end dates.")
+        
         tmp_query_string = query_filter.query_string
         query_string = []
         for i in range(0, len(date_range) - 1):
             tmp_start_date, tmp_end_date = date_range[i], date_range[i + 1]
-            tmp_date_string = "&startdatetime=" + tmp_start_date + "&enddatetime=" + tmp_end_date + "&maxrecords"
-            tmp_query_string = text_regex(str_1="&startdatetime",
-                                          str_2="&maxrecords",
-                                          newstring=tmp_date_string,
-                                          text=tmp_query_string)
+            
+            # Use the new replace_datetime_params function for cleaner replacement
+            try:
+                tmp_query_string = replace_datetime_params(
+                    text=tmp_query_string,
+                    start_datetime=tmp_start_date,
+                    end_datetime=tmp_end_date
+                )
+            except Exception as e:
+                return ValueError(f"Failed to build query string: {e}")
+            
             query_string.append(tmp_query_string)
 
         pool = multiprocessing.Pool(cpu_num)
@@ -167,14 +278,39 @@ def article_search(query_filter=None,
                          mode="artlist",
                          proxy=proxy)
         print("[+] Downloading...")
-        articles_list = list(
-            tqdm.tqdm(pool.imap_unordered(worker, query_string),
-                      total=len(query_string)))
+        try:
+            articles_list = list(
+                tqdm.tqdm(pool.imap_unordered(worker, query_string),
+                          total=len(query_string)))
+        finally:
+            pool.close()
+            pool.terminate()
+            pool.join()
 
-        return pd.concat(articles_list).drop_duplicates().reset_index(
-            drop=True)
+        # Debug: Check what we got
+        errors = [item for item in articles_list if isinstance(item, Exception)]
+        if errors:
+            first_error = errors[0]
+            error_detail = str(first_error) if first_error else "Unknown error"
+            print(f"[!] Warning: {len(errors)} queries failed. First error type: {type(first_error).__name__}, Error: {error_detail}")
+
+        # Filter out errors and keep only DataFrames
+        valid_articles = [df for df in articles_list if isinstance(df, pd.DataFrame) and len(df) > 0]
+        
+        if not valid_articles:
+            error_msg = "No valid articles found. "
+            if errors:
+                first_error = errors[0]
+                error_detail = str(first_error) if first_error else "Unknown error"
+                error_msg += f"First error ({type(first_error).__name__}): {error_detail}"
+            else:
+                error_msg += "All queries returned empty results."
+            return ValueError(error_msg)
+        
+        return pd.concat(valid_articles).drop_duplicates().reset_index(drop=True)
     except Exception as e:
-        return (e)
+        # Return exception directly, not wrapped in a tuple
+        return e
 
 
 def timeline_search(query_filter=None,
@@ -188,6 +324,8 @@ def timeline_search(query_filter=None,
     timeline = doc_query_search(query_string=tmp_query_string,
                                 max_recursion_depth=max_recursion_depth,
                                 mode=query_mode)
+    if isinstance(timeline, Exception):
+        return timeline
     timeline["date"] = pd.to_datetime(timeline["date"],
                                       format="%Y%m%dT%H%M%SZ")
     return timeline

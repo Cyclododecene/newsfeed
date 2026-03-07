@@ -62,9 +62,9 @@ class Art_Filter:
         self.end_date = None
 
         # check date
-        if not start_date and not end_date:
-            raise ValueError("Must provide either start_date and end_date")
-        if len(start_date) < 10 and len(end_date) < 10:
+        if not start_date or not end_date:
+            raise ValueError("Must provide both start_date and end_date")
+        if len(start_date) < 10 or len(end_date) < 10:
             raise ValueError(
                 "Format of time: 'YYYY-MM-DD' or 'YYYY-MM-DD-HH-MM-SS'")
 

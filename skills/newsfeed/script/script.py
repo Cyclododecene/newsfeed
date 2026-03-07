@@ -20,25 +20,26 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 from newsfeed.news.db.events import EventV1, EventV2
-from newsfeed.news.db.gkg import GKGV1, GKGV2
+from newsfeed.news.apis.filters import Art_Filter
+from newsfeed.news.apis.query import article_search
 
 
 def search_topics(days: int = 1, keywords: list = None, output: str = None, use_cache: bool = True):
     """
-    Scenario 1: Search news by keywords/themes from GKG database
+    Scenario 1: Search news by keywords/themes using GDELT API
     
     Args:
         days: Number of days to search back
         keywords: List of keywords/themes to search
         output: Output filename
-        use_cache: Use cached results
+        use_cache: Use cached results (API doesn't use cache, kept for compatibility)
     """
     print(f"\n{'='*60}")
     print("Scenario 1: Search News by Keywords/Themes")
     print(f"{'='*60}")
     print(f"Days to search: {days}")
     print(f"Keywords: {keywords if keywords else 'None (required)'}")
-    print(f"Use cache: {use_cache}")
+    print(f"Method: GDELT API (server-side filtering)")
     print(f"{'='*60}\n")
     
     # Validate keywords
@@ -51,48 +52,94 @@ def search_topics(days: int = 1, keywords: list = None, output: str = None, use_
     end_date = datetime.now()
     start_date = end_date - timedelta(days=days)
     
-    # Format for GKG V2
-    start_str = start_date.strftime("%Y-%m-%d-00-00-00")
-    end_str = end_date.strftime("%Y-%m-%d-00-00-00")
+    # Format for API (YYYYMMDDHHMMSS)
+    start_str = start_date.strftime("%Y%m%d%H%M%S")
+    end_str = end_date.strftime("%Y%m%d%H%M%S")
     
-    print(f"Date range: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
+    print(f"Date range: {start_date.strftime('%Y-%m-%d %H:%M:%S')} to {end_date.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Time range: {days} day(s)")
     
-    # Query GKG database
-    print("\nQuerying GKG database...")
-    gkg = GKGV2(
+    # Create filter with keywords
+    print(f"\nCreating search filter with keywords: {', '.join(keywords)}")
+    f = Art_Filter(
+        keyword=keywords,
         start_date=start_str,
         end_date=end_str,
-        use_cache=use_cache,
-        use_async=True
+        num_records=250
     )
-    results = gkg.query()
     
-    if len(results) == 0:
-        print("No data found for the specified date range.")
+    # Query using API
+    print("\nQuerying GDELT API (this may take a while)...")
+    print("Note: API performs server-side filtering for efficiency")
+    
+    # Use time_range of 60 minutes for balanced performance
+    # Note: API requires time_range >= 30 minutes
+    time_range = max(30, 60)  # Ensure at least 30 minutes
+    articles = article_search(query_filter=f, max_recursion_depth=100, time_range=time_range)
+    
+    # Check if article_search returned an error
+    if isinstance(articles, Exception):
+        # Handle error case
+        error_type = type(articles).__name__
+        error_msg = str(articles)
+        print(f"\n❌ Error querying API: {error_type}")
+        print(f"   {error_msg}")
+        print("\nPossible reasons:")
+        print("  - No articles found for the specified keywords and time range")
+        print("  - Network connectivity issues")
+        print("  - API rate limiting")
+        print("  - Invalid date range or parameters")
+        print("  - API returned invalid data format")
+        print("\nSuggestions:")
+        print("  - Try a broader time range (--days 7 or --days 30)")
+        print("  - Try different keywords")
+        print("  - Check your internet connection")
+        print("  - Verify the date range is valid")
+        print("  - Try again later (API might be temporarily unavailable)")
         return None
     
-    # Filter by keywords
-    print(f"\nFiltering by keywords...")
-    keyword_pattern = '|'.join(keywords)
-    filtered_news = results[
-        results['V2ENHANCEDTHEMES'].str.contains(
-            keyword_pattern, case=False, na=False
-        )
-    ]
+    if len(articles) == 0:
+        print("\nNo articles found for the specified keywords and time range.")
+        print("Suggestions:")
+        print("  - Try a broader time range (--days 7 or --days 30)")
+        print("  - Try different keywords")
+        print("  - Check keyword spelling")
+        return None
     
-    print(f"Found {len(filtered_news)} articles matching keywords")
+    print(f"\nFound {len(articles)} articles matching keywords")
     
     # Show statistics
     print(f"\nStatistics:")
-    print(f"  Total articles: {len(results)}")
-    print(f"  Matching articles: {len(filtered_news)}")
-    print(f"  Percentage: {len(filtered_news)/len(results)*100:.2f}%")
+    print(f"  Total articles found: {len(articles)}")
+    
+    # Date distribution
+    if 'timeadded' in articles.columns:
+        articles['date'] = pd.to_datetime(articles['timeadded'], format='%Y%m%d%H%M%S', errors='coerce')
+        date_counts = articles['date'].dt.date.value_counts().sort_index()
+        print(f"\n  Date distribution (top {min(5, len(date_counts))}):")
+        for date, count in date_counts.head(5).items():
+            print(f"    {date}: {count} articles")
+    
+    # Source analysis
+    if 'url' in articles.columns:
+        articles['domain'] = articles['url'].apply(lambda x: x.split('/')[2] if isinstance(x, str) and len(x.split('/')) > 2 else 'Unknown')
+        top_sources = articles['domain'].value_counts().head(10)
+        print(f"\n  Top 10 sources:")
+        for i, (source, count) in enumerate(top_sources.items(), 1):
+            print(f"    {i}. {source}: {count}")
     
     # Show sample results
     print(f"\nSample results (first 5):")
-    sample_cols = ['V2.1DATE', 'V2SOURCECOMMONNAME', 'V2ENHANCEDTHEMES', 'V2TONE']
-    available_cols = [col for col in sample_cols if col in filtered_news.columns]
-    print(filtered_news[available_cols].head(5).to_string(index=False))
+    # Available columns in API results: url, title, seendate, domain, language, etc.
+    sample_cols = ['title', 'url', 'seendate', 'domain', 'language']
+    available_cols = [col for col in sample_cols if col in articles.columns]
+    sample_data = articles[available_cols].head(5).copy()
+    
+    # Truncate URLs for display
+    if 'url' in sample_data.columns:
+        sample_data['url'] = sample_data['url'].apply(lambda x: x[:80] + '...' if len(str(x)) > 80 else x)
+    
+    print(sample_data.to_string(index=False))
     
     # Export results
     if output is None:
@@ -100,10 +147,12 @@ def search_topics(days: int = 1, keywords: list = None, output: str = None, use_
         output = f"search_{keyword_str}_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.csv"
     
     print(f"\nSaving to: {output}")
-    filtered_news.to_csv(output, index=False)
+    articles.to_csv(output, index=False)
     print(f"Results saved: {os.path.abspath(output)}")
+    print(f"\n💡 Note: Results were obtained using GDELT API with server-side filtering")
+    print(f"   This method is faster and more efficient than downloading full database files")
     
-    return filtered_news
+    return articles
 
 
 def view_bilateral_events(days: int = 7, country1: str = None, country2: str = None, 

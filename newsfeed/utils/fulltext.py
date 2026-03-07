@@ -59,25 +59,36 @@ def download_arxiv(url):  # arxiv means internet archive
             pass  # return None
 
 def reconstruct_url(url):
-    # check protocol
-    url_root = urlparse(url).scheme + "://" + urlparse(url).netloc
-    response = requests.get(url_root, headers = generate_header())
-    url_root = response.url
-    url = url_root + urlparse(url).path + urlparse(url).params + urlparse(url).query + urlparse(url).fragment
-    return url
+    """Follow any root-level redirect and rebuild the full URL with the
+    resolved base, preserving path / query / fragment."""
+    parsed = urlparse(url)
+    url_root = parsed.scheme + "://" + parsed.netloc
+    try:
+        response = requests.get(url_root, headers=generate_header(), timeout=10,
+                                allow_redirects=True)
+        resolved_root = response.url.rstrip("/")
+    except Exception:
+        resolved_root = url_root
+
+    rebuilt = resolved_root + parsed.path
+    if parsed.params:
+        rebuilt += ";" + parsed.params
+    if parsed.query:
+        rebuilt += "?" + parsed.query
+    if parsed.fragment:
+        rebuilt += "#" + parsed.fragment
+    return rebuilt
 
 def check_url(url):
     print("[+] Checking if page exists...")
-
     try:
-        # Requesting for only the HTTP header without downloading the page
-        # If the page doesn't exist, it's a waste of resources to try scraping (directly).
         response = requests.get(url, timeout=240, headers=generate_header())
         if response.status_code != 200:
-            return int(404)
-    except:
+            return 404
+        return response.status_code  # 200
+    except Exception:
         print(":( Connection related Error/Timeout, skipping...")
-        return int(404)
+        return 404
 
 
 def download(url):

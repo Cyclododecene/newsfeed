@@ -23,4 +23,6 @@ aiofiles = "*"
 pyarrow = "*"
 joblib = "*"
 pytest = ">=9.0.2,<10"
+
+[pypi-dependencies]
 newspaper4k = ">=0.9.4.1"

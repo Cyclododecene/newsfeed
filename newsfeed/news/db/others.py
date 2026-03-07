@@ -5,7 +5,6 @@ updated: 2026 - Performance optimizations
 """
 import re
 import io
-from multiprocessing.sharedctypes import Value
 import time
 import tqdm
 import requests

@@ -27,7 +27,7 @@ def test_event_v1_basic():
     results = gdelt_events_v1.query()
     assert type(results) == pd.DataFrame
     assert len(results) > 0 or len(results.columns) > 0
-    print("✓ EventV1 basic query passed")
+    print("✓ EventV1 basic query passed")0.
 
 
 def test_event_v1_nowtime():

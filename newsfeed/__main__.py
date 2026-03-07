@@ -31,6 +31,7 @@ from tqdm import tqdm
 from newsfeed.news.db.events import EventV1, EventV2
 from newsfeed.news.db.gkg import GKGV1, GKGV2
 from newsfeed.utils.fulltext import download, download_batch
+from newsfeed.utils.export import export_results
 
 
 def parse_date(version: str, date_str: str) -> str:
@@ -354,7 +355,7 @@ Examples:
         "--format",
         type=str.lower,
         default="csv",
-        choices=["csv", "json", "txt"],
+        choices=["csv", "json", "jsonl", "parquet", "txt"],
         help="Output format (default: csv)"
     )
     
@@ -578,14 +579,12 @@ Examples:
         
         # Export results
         print(f"\nExporting results to {args.output}...")
-        
-        if args.format == "csv":
-            results.to_csv(args.output, index=False)
-        elif args.format == "json":
-            results.to_json(args.output, orient='records', force_ascii=False)
-        elif args.format == "txt":
+
+        if args.format == "txt":
             print("Warning: TXT format is only supported for single URL download. Using CSV instead.")
-            results.to_csv(args.output, index=False)
+            export_results(results, "csv", args.output)
+        else:
+            export_results(results, args.format, args.output)
         
         print(f"Results saved to: {os.path.abspath(args.output)}")
         print(f"\n{'='*60}")

@@ -18,6 +18,7 @@ from tenacity import retry, stop_after_attempt
 from newsfeed.utils.cache import get_cache_manager
 from newsfeed.utils.incremental import get_incremental_manager
 from newsfeed.utils.async_downloader import run_async_download
+from newsfeed.utils.export import export_results
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -66,6 +67,18 @@ class EventV1(object):
         self.output_format = output_format
         self.cache_manager = get_cache_manager() if use_cache else None
         self.incremental_manager = get_incremental_manager() if use_incremental else None
+
+    def export(self, results: pd.DataFrame, filepath: str = None) -> None:
+        """
+        Export query results to the format set by ``output_format``.
+
+        Args:
+            results:  DataFrame returned by :py:meth:`query`.
+            filepath: Destination file path.  Auto-generated if *None*.
+
+        Supported formats: ``"csv"``, ``"json"``, ``"jsonl"``, ``"parquet"``.
+        """
+        export_results(results, self.output_format, filepath)
 
     def _generate_header(self):
         ua = UserAgent()
@@ -208,14 +221,12 @@ class EventV1(object):
         print("[+] Downloading... date:{}".format(
             datetime.strftime(dt, "%Y-%m-%d")))
         results = self._download_file(url=url)
-        if type(results) != pd.DataFrame:
+        if not isinstance(results, pd.DataFrame):
             print(results)
-            results = self.query_nowtime(date=datetime.strftime(dt - timedelta(days=1), "%Y-%m-%d"))
-            return results
-        else:
-            results.reset_index(drop=True, inplace=True)
-            results.columns = self.columns_name
-            return results
+            return None
+        results.reset_index(drop=True, inplace=True)
+        results.columns = self.columns_name
+        return results
 
 
 class EventV2(object):
@@ -275,6 +286,18 @@ class EventV2(object):
         self.cache_manager = get_cache_manager() if use_cache else None
         self.incremental_manager = get_incremental_manager() if use_incremental else None
 
+    def export(self, results: pd.DataFrame, filepath: str = None) -> None:
+        """
+        Export query results to the format set by ``output_format``.
+
+        Args:
+            results:  DataFrame returned by :py:meth:`query`.
+            filepath: Destination file path.  Auto-generated if *None*.
+
+        Supported formats: ``"csv"``, ``"json"``, ``"jsonl"``, ``"parquet"``.
+        """
+        export_results(results, self.output_format, filepath)
+
     def _generate_header(self):
         ua = UserAgent()
         header = {"User-Agent": str(ua.random)}
@@ -284,7 +307,7 @@ class EventV2(object):
     def _query_list(self) -> list:
 
         if self.table != "events" and self.table != "mentions":
-            return ValueError(
+            raise ValueError(
                 "Wrong table name, EventV2 is only used for querying Event and Mentions"
             )
 
@@ -488,6 +511,9 @@ class EventV2(object):
         print("[+] Downloading... date:{}".format(
             datetime.strftime(dt, "%Y-%m-%d %H:%M:%S")))
         results = self._download_file(url=url)
+        if not isinstance(results, pd.DataFrame):
+            print(results)
+            return None
         results.reset_index(drop=True, inplace=True)
         if self.table == "events":
             results.columns = self.columns_name_events
