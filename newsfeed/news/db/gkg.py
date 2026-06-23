@@ -188,24 +188,32 @@ class GKGV1(object):
         
         return results
 
-    def query_nowtime(self, date: str = None):
+    def query_nowtime(self, date: str = None, max_lookback: int = 7):
+        """Query the nearest available daily GKG V1 file."""
         if date == None:
             dt = datetime.now(timezone.utc) - timedelta(days=1)
         else:
             dt = datetime.strptime(date, "%Y-%m-%d")
 
-        url = datetime.strftime(dt, "%Y%m%d") + ".gkg.csv.zip"
-        print("[+] Downloading... date:{}".format(
-            datetime.strftime(dt, "%Y-%m-%d")))
-        results = self._download_file(url=url)
-        if type(results) != pd.DataFrame:
+        last_error = None
+        for offset in range(max_lookback + 1):
+            candidate_dt = dt - timedelta(days=offset)
+            url = datetime.strftime(candidate_dt, "%Y%m%d") + ".gkg.csv.zip"
+            print("[+] Downloading... date:{}".format(
+                datetime.strftime(candidate_dt, "%Y-%m-%d")))
+            results = self._download_file(url=url)
+            if isinstance(results, pd.DataFrame):
+                results.reset_index(drop=True, inplace=True)
+                results.columns = self.columns_name
+                return results
+            last_error = results
             print(results)
-            results = self.query_nowtime(date=datetime.strftime(dt - timedelta(days=1), "%Y-%m-%d"))
-            return results
-        else:
-            results.reset_index(drop=True, inplace=True)
-            results.columns = self.columns_name
-            return results
+
+        raise ValueError(
+            "No GKG V1 data found within {} day(s) before {}. Last error: {}".format(
+                max_lookback, datetime.strftime(dt, "%Y-%m-%d"), last_error
+            )
+        )
 
 
 class GKGV2(object):
@@ -399,28 +407,39 @@ class GKGV2(object):
         
         return results
 
-    def query_nowtime(self, date: str = None):
+    def query_nowtime(self, date: str = None, max_lookback: int = 8):
+        """Query the nearest available 15-minute GKG V2 file."""
         if date == None:
             dt = datetime.now(timezone.utc)
         else:
             dt = datetime.strptime(date, "%Y-%m-%d-%H-%M-%S")
 
+        rounded_dt = datetime(dt.year, dt.month, dt.day, dt.hour,
+                              15 * (dt.minute // 15))
         if self.translation:
-            url = datetime.strftime(
-                datetime(dt.year, dt.month, dt.day, dt.hour, 15 *
-                         (dt.minute // 15)) - timedelta(minutes=15),
-                "%Y%m%d%H%M%S") + ".translation.gkg.csv.zip"
-        else:
-            url = datetime.strftime(
-                datetime(dt.year, dt.month, dt.day, dt.hour, 15 *
-                         (dt.minute // 15)), "%Y%m%d%H%M%S") + ".gkg.csv.zip"
+            rounded_dt = rounded_dt - timedelta(minutes=15)
 
-        print("[+] Downloading... date:{}".format(
-            datetime.strftime(dt, "%Y-%m-%d %H:%M:%S")))
-        results = self._download_file(url=url)
-        results.reset_index(drop=True, inplace=True)
-        results.columns = self.columns_name
-        return results
+        last_error = None
+        for offset in range(max_lookback + 1):
+            candidate_dt = rounded_dt - timedelta(minutes=15 * offset)
+            suffix = ".translation.gkg.csv.zip" if self.translation else ".gkg.csv.zip"
+            url = datetime.strftime(candidate_dt, "%Y%m%d%H%M%S") + suffix
+
+            print("[+] Downloading... date:{}".format(
+                datetime.strftime(candidate_dt, "%Y-%m-%d %H:%M:%S")))
+            results = self._download_file(url=url)
+            if isinstance(results, pd.DataFrame):
+                results.reset_index(drop=True, inplace=True)
+                results.columns = self.columns_name
+                return results
+            last_error = results
+            print(results)
+
+        raise ValueError(
+            "No GKG V2 data found within {} interval(s) before {}. Last error: {}".format(
+                max_lookback, datetime.strftime(rounded_dt, "%Y-%m-%d-%H-%M-%S"), last_error
+            )
+        )
 
 
 if __name__ == "__main__":

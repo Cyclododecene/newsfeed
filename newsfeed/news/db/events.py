@@ -196,26 +196,32 @@ class EventV1(object):
         
         return results
 
-    def query_nowtime(self, date: str = None):
-        # by default the self.start_date variable is None, then the func will query for the nearest files
-        # if self.start_date is valued, then the func will query the given datetime
+    def query_nowtime(self, date: str = None, max_lookback: int = 7):
+        """Query the nearest available daily Events V1 file."""
         if date == None:
             dt = datetime.now(timezone.utc) - timedelta(days=1)
         else:
             dt = datetime.strptime(date, "%Y-%m-%d")
 
-        url = datetime.strftime(dt, "%Y%m%d") + ".export.CSV.zip"
-        print("[+] Downloading... date:{}".format(
-            datetime.strftime(dt, "%Y-%m-%d")))
-        results = self._download_file(url=url)
-        if type(results) != pd.DataFrame:
+        last_error = None
+        for offset in range(max_lookback + 1):
+            candidate_dt = dt - timedelta(days=offset)
+            url = datetime.strftime(candidate_dt, "%Y%m%d") + ".export.CSV.zip"
+            print("[+] Downloading... date:{}".format(
+                datetime.strftime(candidate_dt, "%Y-%m-%d")))
+            results = self._download_file(url=url)
+            if isinstance(results, pd.DataFrame):
+                results.reset_index(drop=True, inplace=True)
+                results.columns = self.columns_name
+                return results
+            last_error = results
             print(results)
-            results = self.query_nowtime(date=datetime.strftime(dt - timedelta(days=1), "%Y-%m-%d"))
-            return results
-        else:
-            results.reset_index(drop=True, inplace=True)
-            results.columns = self.columns_name
-            return results
+
+        raise ValueError(
+            "No Events V1 data found within {} day(s) before {}. Last error: {}".format(
+                max_lookback, datetime.strftime(dt, "%Y-%m-%d"), last_error
+            )
+        )
 
 
 class EventV2(object):
@@ -454,47 +460,42 @@ class EventV2(object):
         
         return results
 
-    def query_nowtime(self, date: str = None):
-        # by default the self.start_date variable is None, then the func will query for the nearest files
-        # if self.start_date is valued, then the func will query the given datetime
+    def query_nowtime(self, date: str = None, max_lookback: int = 8):
+        """Query the nearest available 15-minute Events V2 or Mentions file."""
         if date == None:
             dt = datetime.now(timezone.utc)
         else:
             dt = datetime.strptime(date, "%Y-%m-%d-%H-%M-%S")
 
-        if self.translation:
-            if self.table != "mentions":
-                url = datetime.strftime(
-                    datetime(dt.year, dt.month, dt.day, dt.hour, 15 *
-                             (dt.minute // 15)),
-                    "%Y%m%d%H%M%S") + ".translation.export.CSV.zip"
-            else:
-                url = datetime.strftime(
-                    datetime(dt.year, dt.month, dt.day, dt.hour, 15 *
-                             (dt.minute // 15)),
-                    "%Y%m%d%H%M%S") + ".translation.mentions.CSV.zip"
-        else:
-            if self.table != "mentions":
-                url = datetime.strftime(
-                    datetime(dt.year, dt.month, dt.day, dt.hour, 15 *
-                             (dt.minute // 15)),
-                    "%Y%m%d%H%M%S") + ".export.CSV.zip"
-            else:
-                url = datetime.strftime(
-                    datetime(dt.year, dt.month, dt.day, dt.hour, 15 *
-                             (dt.minute // 15)),
-                    "%Y%m%d%H%M%S") + ".mentions.CSV.zip"
+        rounded_dt = datetime(dt.year, dt.month, dt.day, dt.hour,
+                              15 * (dt.minute // 15))
+        last_error = None
+        columns = self.columns_name_mentions if self.table == "mentions" else self.columns_name_events
 
-        print("[+] Downloading... date:{}".format(
-            datetime.strftime(dt, "%Y-%m-%d %H:%M:%S")))
-        results = self._download_file(url=url)
-        results.reset_index(drop=True, inplace=True)
-        if self.table == "events":
-            results.columns = self.columns_name_events
-            return results
-        else:
-            results.columns = self.columns_name_mentions
-            return results
+        for offset in range(max_lookback + 1):
+            candidate_dt = rounded_dt - timedelta(minutes=15 * offset)
+            timestamp = datetime.strftime(candidate_dt, "%Y%m%d%H%M%S")
+            if self.translation:
+                suffix = ".translation.mentions.CSV.zip" if self.table == "mentions" else ".translation.export.CSV.zip"
+            else:
+                suffix = ".mentions.CSV.zip" if self.table == "mentions" else ".export.CSV.zip"
+            url = timestamp + suffix
+
+            print("[+] Downloading... date:{}".format(
+                datetime.strftime(candidate_dt, "%Y-%m-%d %H:%M:%S")))
+            results = self._download_file(url=url)
+            if isinstance(results, pd.DataFrame):
+                results.reset_index(drop=True, inplace=True)
+                results.columns = columns
+                return results
+            last_error = results
+            print(results)
+
+        raise ValueError(
+            "No Events V2 {} data found within {} interval(s) before {}. Last error: {}".format(
+                self.table, max_lookback, datetime.strftime(rounded_dt, "%Y-%m-%d-%H-%M-%S"), last_error
+            )
+        )
 
 
 if __name__ == "__main__":

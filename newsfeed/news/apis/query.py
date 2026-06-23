@@ -31,12 +31,16 @@ import tqdm
 import requests
 import pandas as pd
 import multiprocessing
+from io import StringIO
 from functools import partial
 from datetime import datetime
 
 import warnings
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
+
+
+TV_NO_QUERY_MODES = {"stationdetails", "trendingtopics"}
 
 
 def text_regex(str_1, str_2, newstring, text):
@@ -68,6 +72,23 @@ def load_json(json_message,
                          max_recursion_depth=max_recursion_depth,
                          recursion_depth=recursion_depth + 1)
     return result
+
+
+def _compact_datetime(date_str: str) -> str:
+    if date_str is None:
+        return None
+    compact = date_str.replace("-", "")
+    if len(compact) != 14 or not compact.isdigit():
+        raise ValueError(
+            "Date must use YYYY-MM-DD-HH-MM-SS or YYYYMMDDHHMMSS format")
+    return compact
+
+
+def _strip_doc_api_params(query_string: str) -> str:
+    query_string = re.sub(r"&startdatetime=\d+", "", query_string)
+    query_string = re.sub(r"&enddatetime=\d+", "", query_string)
+    query_string = re.sub(r"&maxrecords=\d+", "", query_string)
+    return query_string.strip()
 
 
 def doc_query_search(query_string=None,
@@ -114,18 +135,36 @@ def doc_query_search(query_string=None,
 def geo_query_search(query_string:str = None,
                      format: str = "GeoJSON",
                      timespan: int = 1,
-                     proxy: dict = None):
+                     proxy: dict = None,
+                     timeout: int = 30,
+                     parse_json: bool = False):
 
     if query_string == None:
         return ValueError("Query string must be provided")
+    if timespan <= 0:
+        return ValueError("Timespan must be a positive integer")
     else:
-        query_string = query_string
         response = requests.get(
-            f"https://api.gdeltproject.org/api/v2/geo/geo?query={query_string}&format={format}&timespan={timespan}d",
-            proxies=proxy)
+            "https://api.gdeltproject.org/api/v2/geo/geo",
+            params={
+                "query": query_string,
+                "format": format,
+                "timespan": "{}d".format(timespan)
+            },
+            proxies=proxy,
+            timeout=timeout)
 
         if response.text == "Timespan is too short.\n":
             return ValueError("Timespan is too short.")
+        if not response.ok:
+            return ValueError("GDELT GEO API request failed with status {}".format(
+                response.status_code))
+
+        if parse_json:
+            try:
+                return response.json()
+            except ValueError as e:
+                return ValueError("GDELT GEO API response is not valid JSON: {}".format(e))
 
         return response.text
 
@@ -196,18 +235,164 @@ def timeline_search(query_filter=None,
 def geo_search(query_filter=None,
                sourcelang: str = None,
                format: str = "GeoJSON",
-               timespan: int = 1, proxy:dict=None):
+               timespan: int = 1,
+               proxy:dict=None,
+               timeout: int = 30,
+               parse_json: bool = False):
 
     if query_filter == None:
         return ValueError("Filter must be provided")
 
-    tmp_query_string = " ".join(query_filter.query_string.split(" ")[:-1])
+    tmp_query_string = _strip_doc_api_params(query_filter.query_string)
     if sourcelang != None:
         tmp_query_string = tmp_query_string + " sourcelang:{}".format(
             sourcelang)
 
     timeline = geo_query_search(query_string=tmp_query_string,
                                 format=format,
-                                timespan=timespan, proxy=proxy)
+                                timespan=timespan,
+                                proxy=proxy,
+                                timeout=timeout,
+                                parse_json=parse_json)
 
     return timeline
+
+
+def tv_query_search(query_string: str = None,
+                    mode: str = "timelinevol",
+                    format: str = "json",
+                    start_date: str = None,
+                    end_date: str = None,
+                    timespan: str = None,
+                    datanorm: str = "perc",
+                    timelinesmooth: int = 0,
+                    datacomb: str = "sep",
+                    last24: bool = None,
+                    timezoom: bool = None,
+                    maxrecords: int = None,
+                    sort: str = None,
+                    dateres: str = None,
+                    timezoneadj: str = None,
+                    proxy: dict = None,
+                    timeout: int = 30,
+                    parse_json: bool = True):
+    """
+    Query the GDELT TV 2.0 API.
+
+    JSON responses are returned as dictionaries by default, CSV responses as
+    DataFrames, and display-oriented formats such as HTML/RSS as raw text.
+    """
+    mode = mode.lower()
+    output_format = format.lower()
+    if query_string is None and mode not in TV_NO_QUERY_MODES:
+        return ValueError("Query string must be provided")
+    if timespan is not None and (start_date is not None or end_date is not None):
+        return ValueError("Use either timespan or start/end dates, not both")
+    if maxrecords is not None and maxrecords <= 0:
+        return ValueError("maxrecords must be a positive integer")
+
+    params = {
+        "mode": mode,
+        "format": output_format,
+        "datanorm": datanorm,
+        "timelinesmooth": timelinesmooth,
+        "datacomb": datacomb,
+    }
+    if query_string is not None:
+        params["query"] = query_string
+    if start_date is not None:
+        params["STARTDATETIME"] = _compact_datetime(start_date)
+    if end_date is not None:
+        params["ENDDATETIME"] = _compact_datetime(end_date)
+    if timespan is not None:
+        params["TIMESPAN"] = timespan
+    if last24 is not None:
+        params["last24"] = "yes" if last24 else "no"
+    if timezoom is not None:
+        params["timezoom"] = "yes" if timezoom else "no"
+    if maxrecords is not None:
+        params["maxrecords"] = maxrecords
+    if sort is not None:
+        params["sort"] = sort
+    if dateres is not None:
+        params["dateres"] = dateres
+    if timezoneadj is not None:
+        params["timezoneadj"] = timezoneadj
+
+    response = requests.get(
+        "https://api.gdeltproject.org/api/v2/tv/tv",
+        params=params,
+        proxies=proxy,
+        timeout=timeout)
+
+    if not response.ok:
+        return ValueError("GDELT TV API request failed with status {}".format(
+            response.status_code))
+    if response.text == "Timespan is too short.\n":
+        return ValueError("Timespan is too short.")
+
+    if output_format == "json":
+        if parse_json:
+            try:
+                return response.json()
+            except ValueError as e:
+                return ValueError("GDELT TV API response is not valid JSON: {}".format(e))
+        return response.text
+    if output_format == "csv":
+        return pd.read_csv(StringIO(response.text))
+
+    return response.text
+
+
+def tv_search(query_filter=None,
+              query_string: str = None,
+              station: str = None,
+              network: str = None,
+              market: str = None,
+              show: str = None,
+              context: str = None,
+              mode: str = "timelinevol",
+              format: str = "json",
+              start_date: str = None,
+              end_date: str = None,
+              timespan: str = None,
+              proxy: dict = None,
+              timeout: int = 30,
+              **kwargs):
+    """Build a TV query from a raw query string or an Art_Filter."""
+    if query_filter is None and query_string is None:
+        return ValueError("Filter or query string must be provided")
+
+    if query_filter is not None:
+        tmp_query_string = _strip_doc_api_params(query_filter.query_string)
+        if start_date is None:
+            start_date = query_filter.start_date
+        if end_date is None:
+            end_date = query_filter.end_date
+    else:
+        tmp_query_string = query_string
+
+    operators = []
+    if station:
+        operators.append("station:{}".format(station))
+    if network:
+        operators.append("network:{}".format(network))
+    if market:
+        operators.append('market:"{}"'.format(market))
+    if show:
+        operators.append('show:"{}"'.format(show))
+    if context:
+        operators.append('context:"{}"'.format(context))
+
+    if operators:
+        tmp_query_string = "{} {}".format(tmp_query_string, " ".join(operators)).strip()
+
+    return tv_query_search(query_string=tmp_query_string,
+                           mode=mode,
+                           format=format,
+                           start_date=start_date,
+                           end_date=end_date,
+                           timespan=timespan,
+                           proxy=proxy,
+                           timeout=timeout,
+                           **kwargs)

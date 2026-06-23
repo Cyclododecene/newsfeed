@@ -5,6 +5,7 @@ updated: 2026 - Performance optimizations
 """
 import re
 import io
+import xml.etree.ElementTree as ET
 from multiprocessing.sharedctypes import Value
 import time
 import tqdm
@@ -51,7 +52,7 @@ class GEG(object):
         self.incremental_manager = get_incremental_manager() if use_incremental else None
 
     def _generate_header(self):
-        ua = UserAgent(verify_ssl=False)
+        ua = UserAgent()
         header = {"User-Agent": str(ua.random)}
         return header
 
@@ -228,7 +229,7 @@ class VGEG(object):
         self.incremental_manager = get_incremental_manager() if use_incremental else None
 
     def _generate_header(self):
-        ua = UserAgent(verify_ssl=False)
+        ua = UserAgent()
         header = {"User-Agent": str(ua.random)}
         return header
 
@@ -241,11 +242,11 @@ class VGEG(object):
                            na_filter=False,
                            low_memory=False,
                            names=["url"])
-        self.domain = self.domain.upper()
         if self.domain == None:
             download_url_list = list(page["url"])
             return download_url_list
         else:
+            self.domain = self.domain.upper()
             url_list = page[page['url'].str.contains(self.domain)]
             if self.raw == True:
                 download_url_list = list(
@@ -414,7 +415,7 @@ class GDG(object):
         self.cache_manager = get_cache_manager() if use_cache else None
 
     def _generate_header(self):
-        ua = UserAgent(verify_ssl=False)
+        ua = UserAgent()
         header = {"User-Agent": str(ua.random)}
         return header
 
@@ -472,7 +473,7 @@ class GFG(object):
         self.latest_date()
 
     def _generate_header(self):
-        ua = UserAgent(verify_ssl=False)
+        ua = UserAgent()
         header = {"User-Agent": str(ua.random)}
         return header
 
@@ -524,6 +525,287 @@ class GFG(object):
                     self.query_date))
 
 
+class GAL(object):
+    base_url = "http://data.gdeltproject.org/gdeltv3/gal/"
+    rss_url = base_url + "feed.rss"
+    columns_name = [
+        "date", "url", "domain", "outletName", "outletLogo",
+        "outletTwitter", "title", "image", "desc", "lang", "author"
+    ]
+    rss_columns_name = ["title", "url", "description", "pubDate", "guid"]
+
+    def __init__(self,
+                 start_date: str = "2020-01-01-00-01-00",
+                 end_date: str = None,
+                 proxy: dict = None,
+                 use_cache: bool = False,
+                 force_redownload: bool = False,
+                 drop_duplicates: bool = True):
+        self.start_date = "".join(start_date.split("-"))
+        self.end_date = "".join(end_date.split("-")) if end_date else self.start_date
+        self.proxy = proxy
+        self.use_cache = use_cache
+        self.force_redownload = force_redownload
+        self.drop_duplicates = drop_duplicates
+        self.cache_manager = get_cache_manager() if use_cache else None
+
+    def _generate_header(self):
+        ua = UserAgent()
+        header = {"User-Agent": str(ua.random)}
+        return header
+
+    def _query_list(self) -> list:
+        download_url_list = [
+            datetime.strftime(i, "%Y%m%d%H%M%S") + ".gal.json.gz"
+            for i in pd.date_range(self.start_date, self.end_date, freq="min")
+        ]
+        return download_url_list
+
+    def _download_file(self, url: str = "20200101000100.gal.json.gz"):
+        download_url = self.base_url + url
+        try:
+            response = requests.get(download_url,
+                                    headers=self._generate_header(),
+                                    proxies=self.proxy,
+                                    timeout=10,
+                                    stream=True)
+            if response.status_code == 404:
+                return "GDELT does not contains this url: {}".format(url)
+
+            response_text = io.BytesIO(response.content)
+            response_df = pd.read_json(response_text,
+                                       compression="gzip",
+                                       lines=True)
+            response_text.flush()
+            response_text.close()
+            return response_df
+        except Exception as e:
+            return e
+
+    def query(self):
+        download_url_list = self._query_list()
+
+        if self.use_cache and not self.force_redownload:
+            cached_data = self.cache_manager.get(
+                db_type="GAL",
+                version="V3",
+                start_date=self.start_date,
+                end_date=self.end_date
+            )
+            if cached_data is not None:
+                print("[+] Loading from cache...")
+                return cached_data
+
+        print("[+] Downloading GAL files... [startdate={} & enddate={}]".format(
+            self.start_date, self.end_date))
+        downloaded_dfs = [self._download_file(url) for url in download_url_list]
+        downloaded_dfs = [df for df in downloaded_dfs if isinstance(df, pd.DataFrame)]
+        if not downloaded_dfs:
+            print("[+] No valid GAL data downloaded")
+            return pd.DataFrame(columns=self.columns_name)
+
+        results = pd.concat(downloaded_dfs)
+        results.reset_index(drop=True, inplace=True)
+        for column in self.columns_name:
+            if column not in results.columns:
+                results[column] = None
+        results = results[self.columns_name]
+        if self.drop_duplicates and "url" in results.columns:
+            results = results.drop_duplicates(subset=["url"]).reset_index(drop=True)
+
+        if self.use_cache:
+            self.cache_manager.set(results,
+                              db_type="GAL",
+                              version="V3",
+                              start_date=self.start_date,
+                              end_date=self.end_date)
+
+        return results
+
+    def query_rss_feed(self):
+        response = requests.get(self.rss_url,
+                                headers=self._generate_header(),
+                                proxies=self.proxy,
+                                timeout=10)
+        if not response.ok:
+            return ValueError(
+                "GDELT GAL RSS feed request failed with status {}".format(
+                    response.status_code))
+
+        root = ET.fromstring(response.content)
+        rows = []
+        for item in root.findall("./channel/item"):
+            rows.append({
+                "title": item.findtext("title"),
+                "url": item.findtext("link"),
+                "description": item.findtext("description"),
+                "pubDate": item.findtext("pubDate"),
+                "guid": item.findtext("guid"),
+            })
+        return pd.DataFrame(rows, columns=self.rss_columns_name)
+
+
+class GSG(object):
+    docembed_base_url = "http://data.gdeltproject.org/gdeltv3/gsg_docembed/"
+    iatv_base_url = "http://data.gdeltproject.org/gdeltv3/gsg_iatvsentembed/"
+
+    def __init__(self,
+                 start_date: str = "2020-01-01-00-00-00",
+                 end_date: str = None,
+                 dataset: str = "docembed",
+                 station: str = None,
+                 proxy: dict = None,
+                 use_cache: bool = False,
+                 use_incremental: bool = False,
+                 force_redownload: bool = False,
+                 use_async: bool = False):
+        dataset = dataset.lower()
+        if dataset not in ["docembed", "iatvsentembed"]:
+            raise ValueError("dataset must be 'docembed' or 'iatvsentembed'")
+        self.dataset = dataset
+        self.station = station.upper() if station else None
+        self.start_date = "".join(start_date.split("-"))
+        self.end_date = "".join(end_date.split("-")) if end_date else self.start_date
+        self.proxy = proxy
+        self.use_cache = use_cache
+        self.use_incremental = use_incremental
+        self.force_redownload = force_redownload
+        self.use_async = use_async
+        self.cpu_num = multiprocessing.cpu_count() * 2
+        self.cache_manager = get_cache_manager() if use_cache else None
+        self.incremental_manager = get_incremental_manager() if use_incremental else None
+
+    def _generate_header(self):
+        ua = UserAgent()
+        header = {"User-Agent": str(ua.random)}
+        return header
+
+    def _query_list(self) -> list:
+        if self.dataset == "docembed":
+            return [
+                datetime.strftime(i, "%Y%m%d%H%M%S") + ".gsg.docembed.json.gz"
+                for i in pd.date_range(self.start_date, self.end_date, freq="15min")
+            ]
+
+        dates = pd.date_range(self.start_date[:8], self.end_date[:8], freq="D")
+        download_url_list = []
+        for query_date in dates:
+            index_url = self.iatv_base_url + datetime.strftime(query_date, "%Y%m%d") + ".txt"
+            page = pd.read_csv(index_url,
+                               sep=" ",
+                               engine="c",
+                               na_filter=False,
+                               low_memory=False,
+                               names=["url"])
+            urls = list(page["url"])
+            if self.station:
+                urls = [url for url in urls if self.station in url.upper()]
+            download_url_list.extend(urls)
+        return download_url_list
+
+    def _download_file(self, url: str):
+        if self.dataset == "docembed":
+            download_url = self.docembed_base_url + url
+        else:
+            download_url = url
+        try:
+            response = requests.get(download_url,
+                                    headers=self._generate_header(),
+                                    proxies=self.proxy,
+                                    timeout=15,
+                                    stream=True)
+            if response.status_code == 404:
+                return "GDELT does not contains this url: {}".format(url)
+
+            response_text = io.BytesIO(response.content)
+            response_df = pd.read_json(response_text,
+                                       compression="gzip",
+                                       lines=True)
+            response_text.flush()
+            response_text.close()
+            return response_df
+        except Exception as e:
+            return e
+
+    def query(self):
+        download_url_list = self._query_list()
+
+        if self.use_cache and not self.force_redownload:
+            cached_data = self.cache_manager.get(
+                db_type="GSG",
+                version="V3",
+                start_date=self.start_date,
+                end_date=self.end_date,
+                dataset=self.dataset,
+                station=self.station
+            )
+            if cached_data is not None:
+                print("[+] Loading from cache...")
+                return cached_data
+
+        if self.use_incremental and not self.force_redownload:
+            new_files = self.incremental_manager.get_new_files(
+                download_url_list,
+                db_type="GSG",
+                version="V3",
+                start_date=self.start_date,
+                end_date=self.end_date,
+                dataset=self.dataset,
+                station=self.station
+            )
+            if len(new_files) == 0:
+                print("[+] No new files to download (incremental mode)")
+                return pd.DataFrame()
+            download_url_list = new_files
+
+        if self.use_async:
+            print("[+] GSG async download is not available for gzip JSON-lines; using synchronous download.")
+
+        pool = multiprocessing.Pool(self.cpu_num)
+        try:
+            print("[+] Downloading GSG files... [dataset={} startdate={} & enddate={}]".format(
+                self.dataset, self.start_date, self.end_date))
+            downloaded_dfs = list(
+                tqdm.tqdm(pool.imap_unordered(self._download_file,
+                                              download_url_list),
+                          total=len(download_url_list)))
+            pool.close()
+            pool.terminate()
+            pool.join()
+        except Exception as e:
+            return e
+
+        downloaded_dfs = [df for df in downloaded_dfs if isinstance(df, pd.DataFrame)]
+        if not downloaded_dfs:
+            print("[+] No valid GSG data downloaded")
+            return pd.DataFrame()
+
+        results = pd.concat(downloaded_dfs)
+        results.reset_index(drop=True, inplace=True)
+
+        if self.use_cache:
+            self.cache_manager.set(results,
+                              db_type="GSG",
+                              version="V3",
+                              start_date=self.start_date,
+                              end_date=self.end_date,
+                              dataset=self.dataset,
+                              station=self.station)
+
+        if self.use_incremental:
+            self.incremental_manager.save_query_history(
+                download_url_list,
+                db_type="GSG",
+                version="V3",
+                start_date=self.start_date,
+                end_date=self.end_date,
+                dataset=self.dataset,
+                station=self.station
+            )
+
+        return results
+
+
 if __name__ == "__main__":
     # GDELT Global Entity Graph
     gdelt_v3_geg = GEG(start_date="2020-01-01", end_date="2020-01-02")
@@ -540,3 +822,11 @@ if __name__ == "__main__":
     # GDELT Global Frontpage Graph
     gdelt_v3_gfg = GFG(query_date="2018-03-02-02-00-00")
     gdelt_v3_gfg_result = gdelt_v3_gfg.query()
+
+    # GDELT Article List
+    gdelt_v3_gal = GAL(start_date="2020-01-01-00-01-00")
+    gdelt_v3_gal_result = gdelt_v3_gal.query()
+
+    # GDELT Global Similarity Graph document embeddings
+    gdelt_v3_gsg = GSG(start_date="2020-01-01-00-00-00", dataset="docembed")
+    gdelt_v3_gsg_result = gdelt_v3_gsg.query()

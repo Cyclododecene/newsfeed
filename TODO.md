@@ -33,46 +33,66 @@
 ## 🚀 Planned Data Analysis and Visualization Features
 
 ### Trend Analysis
-- [ ] Time series analysis for event frequency trends
-- [ ] Sentiment trend analysis over time
-- [ ] Goldstein scale trend analysis
-- [ ] Actor activity trend analysis
-- [ ] Interactive trend visualization (Plotly)
+- [x] Time series analysis for event frequency trends
+- [x] Sentiment trend analysis over time
+- [x] Goldstein scale trend analysis
+- [x] Actor activity trend analysis
+- [x] Interactive trend visualization (Plotly)
 
 ### Geographical Visualization
-- [ ] Event heatmaps on interactive maps
-- [ ] Actor location markers and connections
-- [ ] Time-based animation of event spread
-- [ ] Multi-layer map visualization
-- [ ] Export to standalone HTML files
+- [x] Event heatmaps on interactive maps
+- [x] Actor location markers and connections
+- [x] Time-based animation of event spread
+- [x] Multi-layer map visualization
+- [x] Export to standalone HTML files
 
 ### Text Analysis
-- [ ] Topic clustering using GKG Themes
-- [ ] Top themes extraction and ranking
-- [ ] Theme evolution over time
-- [ ] Theme similarity matrix
-- [ ] Word cloud generation for themes
+- [x] Topic clustering using GKG Themes
+- [x] Top themes extraction and ranking
+- [x] Theme evolution over time
+- [x] Theme similarity matrix
+- [x] Word cloud generation for themes
 
 ### Network Analysis
-- [ ] Actor relationship network construction
-- [ ] Event cascade analysis
-- [ ] Centrality metrics calculation
-- [ ] Community detection
-- [ ] Interactive network visualization
+- [x] Actor relationship network construction
+- [x] Event cascade analysis
+- [x] Centrality metrics calculation
+- [x] Community detection
+- [x] Interactive network visualization
 
 ### Sentiment Analysis Enhancement
-- [ ] Multi-dimensional sentiment analysis
-- [ ] Sentiment polarity classification
-- [ ] Sentiment anomaly detection
-- [ ] Sentiment fluctuation analysis
-- [ ] Sentiment heatmaps by region/actor
+- [x] Multi-dimensional sentiment analysis
+- [x] Sentiment polarity classification
+- [x] Sentiment anomaly detection
+- [x] Sentiment fluctuation analysis
+- [x] Sentiment heatmaps by region/actor
+
+## 🔧 Missing Core Features and Integration Gaps
+
+### GDELT API and Database Coverage
+- [x] Build support for GDELT TV 2.0 API queries
+- [x] Reconstruct and harden the GEO API wrapper beyond the current beta implementation
+- [x] Add Global Similarity Graph (GSG) database query support
+- [x] Add GDELT Article List / RSS feed support as a separate data source from DOC API `artlist`
+
+### CLI and Output Integration
+- [x] Add CLI entry points for `GEG`, `VGEG`, `GDG`, and `GFG` classes from `newsfeed/news/db/others.py`
+- [x] Implement real Parquet output support for Event/GKG query classes and CLI `--format parquet`
+- [x] Keep `requirements.txt`, `setup.py`, and `pixi.toml` synchronized when Parquet or visualization dependencies change
+
+### Existing Feature Improvements
+- [x] Improve `query_nowtime()` behavior and coverage for Event and GKG classes
+- [x] Add tests for GEO API behavior and `others.py` database classes
+- [x] Add tests for TV API support
+- [x] Add tests covering CLI output formats, including CSV, JSON, TXT, and future Parquet support
 
 ## 📋 Original TODO Items (Lower Priority)
 
-1. Improve `query_nowtime()` function
-2. Reconstruct `GEO API` and build `TV API`
-3. Add [GSG database](https://blog.gdeltproject.org/announcing-the-global-similarity-graph/) and [GEG database](https://blog.gdeltproject.org/announcing-the-global-entity-graph-geg-and-a-new-11-billion-entity-dataset/) to query list
-4. Add [GDELT Article List](https://blog.gdeltproject.org/announcing-the-gdelt-article-list-rss-feed/)
+1. [x] Improve `query_nowtime()` function
+2. [x] Reconstruct `GEO API`
+3. [x] Build `TV API`
+4. [x] Add [GSG database](https://blog.gdeltproject.org/announcing-the-global-similarity-graph/) to query list
+5. [x] Add [GDELT Article List](https://blog.gdeltproject.org/announcing-the-gdelt-article-list-rss-feed/)
 
 ## 🎯 Usage Examples (After Optimizations)
 

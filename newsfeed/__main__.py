@@ -22,6 +22,7 @@ Usage:
 """
 
 import argparse
+import json
 import sys
 import os
 import pandas as pd
@@ -30,7 +31,61 @@ from tqdm import tqdm
 
 from newsfeed.news.db.events import EventV1, EventV2
 from newsfeed.news.db.gkg import GKGV1, GKGV2
+from newsfeed.news.db.others import GEG, VGEG, GDG, GFG, GAL, GSG
 from newsfeed.utils.fulltext import download, download_batch
+
+
+SUPPORTED_OUTPUT_FORMATS = ["csv", "json", "txt", "parquet"]
+VERSIONED_DATABASES = ["EVENT", "GKG", "MENTIONS"]
+V3_DATABASES = ["GEG", "VGEG", "GDG", "GFG", "GAL", "GSG"]
+SUPPORTED_DATABASES = VERSIONED_DATABASES + V3_DATABASES
+
+
+def save_results(results, output_path: str, output_format: str, allow_txt: bool = False) -> str:
+    """
+    Save query or full-text results to disk.
+
+    Args:
+        results: A pandas DataFrame or a list of dictionaries.
+        output_path: Destination file path.
+        output_format: csv, json, txt, or parquet.
+        allow_txt: Whether TXT output is valid for this result type.
+
+    Returns:
+        The format that was actually written.
+    """
+    output_format = output_format.lower()
+    if isinstance(results, pd.DataFrame):
+        df = results
+        records = None
+    else:
+        records = results
+        df = pd.DataFrame(results)
+
+    if output_format == "csv":
+        df.to_csv(output_path, index=False)
+        return "csv"
+    if output_format == "json":
+        if records is not None:
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(records, f, ensure_ascii=False, indent=2)
+        else:
+            df.to_json(output_path, orient='records', force_ascii=False)
+        return "json"
+    if output_format == "parquet":
+        df.to_parquet(output_path, index=False)
+        return "parquet"
+    if output_format == "txt":
+        if allow_txt and records is not None and len(records) == 1 and records[0].get('success'):
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write(records[0]['text'])
+            return "txt"
+
+        print("Warning: TXT format is only supported for successful single URL full text downloads. Using CSV instead.")
+        df.to_csv(output_path, index=False)
+        return "csv"
+
+    raise ValueError(f"Unsupported output format: {output_format}")
 
 
 def parse_date(version: str, date_str: str) -> str:
@@ -62,6 +117,26 @@ def parse_date(version: str, date_str: str) -> str:
             raise argparse.ArgumentTypeError(
                 f"Invalid date format for V2: '{date_str}'. Expected format: YYYY-MM-DD-HH-MM-SS (e.g., 2021-01-01-00-00-00)"
             )
+
+
+def parse_v3_date(db_type: str, date_str: str) -> str:
+    """Parse dates for GDELT V3 graph datasets."""
+    if db_type in ["GEG", "VGEG"] or (db_type == "GSG" and len(date_str) == 10):
+        try:
+            datetime.strptime(date_str, "%Y-%m-%d")
+            return date_str
+        except ValueError:
+            raise argparse.ArgumentTypeError(
+                f"Invalid date format for {db_type}: '{date_str}'. Expected format: YYYY-MM-DD (e.g., 2021-01-01)"
+            )
+
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d-%H-%M-%S")
+        return date_str
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            f"Invalid date format for {db_type}: '{date_str}'. Expected format: YYYY-MM-DD-HH-MM-SS (e.g., 2018-07-27-14-00-00)"
+        )
 
 
 def download_fulltext(url: str) -> dict:
@@ -221,7 +296,7 @@ def read_urls_from_file(input_file: str, url_column: str = None) -> list:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Query GDELT Project databases (Events, GKG, Mentions) and download full text articles",
+        description="Query GDELT Project databases and download full text articles",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -246,6 +321,16 @@ Examples:
   # Query Mentions V2 with JSON output
   python -m newsfeed --db MENTIONS --version V2 --start 2021-01-01-00-00-00 --end 2021-01-02-00-00-00 --format json
 
+  # Query GDELT V3 graph datasets
+  python -m newsfeed --db GEG --start 2020-01-01 --end 2020-01-02
+  python -m newsfeed --db VGEG --start 2020-01-01 --domain CNN
+  python -m newsfeed --db GDG --start 2018-08-27-14-00-00
+  python -m newsfeed --db GFG --start 2018-03-02-02-00-00
+  python -m newsfeed --db GAL --start 2020-01-01-00-01-00
+  python -m newsfeed --db GAL --rss --format json
+  python -m newsfeed --db GSG --gsg-dataset docembed --start 2020-01-01-00-00-00
+  python -m newsfeed --db GSG --gsg-dataset iatvsentembed --start 2009-07-02 --domain CNN
+
   # Query and download full text
   python -m newsfeed --db EVENT --version V2 --start 2021-01-01-00-00-00 --end 2021-01-02-00-00-00 --download-fulltext
 
@@ -261,15 +346,15 @@ Examples:
     parser.add_argument(
         "--db",
         type=str.upper,
-        choices=["EVENT", "GKG", "MENTIONS"],
+        choices=SUPPORTED_DATABASES,
         help="Database type to query"
     )
     
     parser.add_argument(
         "--version",
         type=str.upper,
-        choices=["V1", "V2"],
-        help="Database version (V1 or V2)"
+        choices=["V1", "V2", "V3"],
+        help="Database version (required for EVENT/GKG/MENTIONS; V3 graph datasets infer V3)"
     )
     
     parser.add_argument(
@@ -281,20 +366,46 @@ Examples:
     parser.add_argument(
         "--end",
         type=str,
-        help="End date (V1: YYYY-MM-DD, V2: YYYY-MM-DD-HH-MM-SS)"
+        help="End date (required for EVENT/GKG/MENTIONS and GEG)"
+    )
+
+    parser.add_argument(
+        "--domain",
+        type=str,
+        help="Station/domain filter for VGEG queries, for example CNN"
+    )
+
+    parser.add_argument(
+        "--raw",
+        action="store_true",
+        help="Download raw VGEG records instead of normalized VGEG v2 records"
+    )
+
+    parser.add_argument(
+        "--rss",
+        action="store_true",
+        help="Query the GDELT Article List rolling RSS feed when --db GAL is used"
+    )
+
+    parser.add_argument(
+        "--gsg-dataset",
+        type=str.lower,
+        default="docembed",
+        choices=["docembed", "iatvsentembed"],
+        help="GSG dataset to query when --db GSG is used"
     )
     
     # Performance optimization arguments
     parser.add_argument(
         "--use-cache",
         action="store_true",
-        help="Use cached query results (90-95% faster for repeated queries)"
+        help="Use cached query results (90-95%% faster for repeated queries)"
     )
     
     parser.add_argument(
         "--incremental",
         action="store_true",
-        help="Use incremental query mode (only download new files, 80-90% faster for updates)"
+        help="Use incremental query mode (only download new files, 80-90%% faster for updates)"
     )
     
     parser.add_argument(
@@ -354,7 +465,7 @@ Examples:
         "--format",
         type=str.lower,
         default="csv",
-        choices=["csv", "json", "txt"],
+        choices=SUPPORTED_OUTPUT_FORMATS,
         help="Output format (default: csv)"
     )
     
@@ -382,7 +493,7 @@ Examples:
         # Set default output filename
         if args.output is None:
             if args.url:
-                args.output = "article.json"
+                args.output = f"article.{args.format}"
             else:
                 args.output = f"fulltexts.{args.format}"
         
@@ -402,25 +513,9 @@ Examples:
             # Save results
             print(f"\nSaving results to {args.output}...")
             
-            if args.format == "json":
-                # For JSON, save all results
-                import json
-                with open(args.output, 'w', encoding='utf-8') as f:
-                    json.dump(results, f, ensure_ascii=False, indent=2)
-            elif args.format == "csv":
-                # For CSV, create DataFrame
-                df = pd.DataFrame(results)
-                df.to_csv(args.output, index=False)
-            elif args.format == "txt":
-                # For TXT, save text content (only for single URL)
-                if len(results) == 1 and results[0].get('success'):
-                    with open(args.output, 'w', encoding='utf-8') as f:
-                        f.write(results[0]['text'])
-                else:
-                    print("Warning: TXT format is only supported for single URL download")
-                    # Fall back to CSV
-                    df = pd.DataFrame(results)
-                    df.to_csv(args.output, index=False)
+            actual_format = save_results(results, args.output, args.format, allow_txt=True)
+            if actual_format != args.format:
+                print(f"Saved as {actual_format.upper()} because {args.format.upper()} was not valid for this result.")
             
             print(f"Results saved to: {os.path.abspath(args.output)}")
             print(f"\n{'='*60}")
@@ -439,31 +534,69 @@ Examples:
         return
     
     # Database query mode
-    if not args.db or not args.version or not args.start or not args.end:
-        parser.error("--db, --version, --start, and --end are required for database query")
-    
-    # Validate dates based on version
-    try:
-        start_date = parse_date(args.version, args.start)
-        end_date = parse_date(args.version, args.end)
-    except argparse.ArgumentTypeError as e:
-        print(f"Error: {e}")
-        sys.exit(1)
+    if not args.db:
+        parser.error("--db is required for database query")
+
+    if args.db in VERSIONED_DATABASES:
+        if not args.version or not args.start or not args.end:
+            parser.error("--db, --version, --start, and --end are required for EVENT/GKG/MENTIONS queries")
+        if args.version == "V3":
+            parser.error("EVENT, GKG, and MENTIONS only support --version V1 or V2")
+
+        # Validate dates based on version
+        try:
+            start_date = parse_date(args.version, args.start)
+            end_date = parse_date(args.version, args.end)
+        except argparse.ArgumentTypeError as e:
+            print(f"Error: {e}")
+            sys.exit(1)
+        display_version = args.version
+    else:
+        if not args.start and not (args.db == "GAL" and args.rss):
+            parser.error(f"--start is required for {args.db} queries")
+        if args.version and args.version != "V3":
+            parser.error(f"{args.db} is a V3 dataset; omit --version or use --version V3")
+        if args.db == "GEG" and not args.end:
+            parser.error("--end is required for GEG queries")
+
+        try:
+            start_date = parse_v3_date(args.db, args.start) if args.start else None
+            end_date = parse_v3_date(args.db, args.end) if args.end else None
+        except argparse.ArgumentTypeError as e:
+            print(f"Error: {e}")
+            sys.exit(1)
+        display_version = "V3"
     
     # Generate default output filename if not specified
     if args.output is None:
         # Remove hyphens from dates for filename
-        start_clean = start_date.replace("-", "")
-        end_clean = end_date.replace("-", "")
-        args.output = f"{args.db}_{args.version}_{start_clean}_{end_clean}.{args.format}"
+        if args.db == "GAL" and args.rss:
+            args.output = f"{args.db}_RSS.{args.format}"
+        else:
+            start_clean = start_date.replace("-", "")
+        if args.db == "GAL" and args.rss:
+            pass
+        elif end_date:
+            end_clean = end_date.replace("-", "")
+            args.output = f"{args.db}_{display_version}_{start_clean}_{end_clean}.{args.format}"
+        else:
+            args.output = f"{args.db}_{display_version}_{start_clean}.{args.format}"
     
     print(f"\n{'='*60}")
     print(f"Newsfeed CLI - GDELT Database Query")
     print(f"{'='*60}")
     print(f"Database:      {args.db}")
-    print(f"Version:       {args.version}")
-    print(f"Start Date:    {start_date}")
-    print(f"End Date:      {end_date}")
+    print(f"Version:       {display_version}")
+    print(f"Start Date:    {start_date or 'N/A'}")
+    print(f"End Date:      {end_date or 'N/A'}")
+    if args.db == "GAL":
+        print(f"RSS Feed:      {args.rss}")
+    if args.db == "GSG":
+        print(f"GSG Dataset:   {args.gsg_dataset}")
+        print(f"Station:       {args.domain or 'all'}")
+    if args.db == "VGEG":
+        print(f"Domain:        {args.domain or 'all'}")
+        print(f"Raw VGEG:      {args.raw}")
     print(f"Output Format: {args.format}")
     print(f"Output File:   {args.output}")
     print(f"Use Cache:     {args.use_cache}")
@@ -479,20 +612,24 @@ Examples:
             if args.version == "V1":
                 db = EventV1(start_date=start_date, end_date=end_date,
                            use_cache=args.use_cache, use_incremental=args.incremental,
-                           force_redownload=args.force_redownload, use_async=args.use_async)
+                           force_redownload=args.force_redownload, use_async=args.use_async,
+                           output_format=args.format)
             else:  # V2
                 db = EventV2(start_date=start_date, end_date=end_date, table="events", translation=False,
                            use_cache=args.use_cache, use_incremental=args.incremental,
-                           force_redownload=args.force_redownload, use_async=args.use_async)
+                           force_redownload=args.force_redownload, use_async=args.use_async,
+                           output_format=args.format)
         elif args.db == "GKG":
             if args.version == "V1":
                 db = GKGV1(start_date=start_date, end_date=end_date,
                            use_cache=args.use_cache, use_incremental=args.incremental,
-                           force_redownload=args.force_redownload, use_async=args.use_async)
+                           force_redownload=args.force_redownload, use_async=args.use_async,
+                           output_format=args.format)
             else:  # V2
                 db = GKGV2(start_date=start_date, end_date=end_date, translation=False,
                            use_cache=args.use_cache, use_incremental=args.incremental,
-                           force_redownload=args.force_redownload, use_async=args.use_async)
+                           force_redownload=args.force_redownload, use_async=args.use_async,
+                           output_format=args.format)
         elif args.db == "MENTIONS":
             if args.version == "V1":
                 print("Error: Mentions database is only available in V2")
@@ -500,11 +637,49 @@ Examples:
             else:  # V2
                 db = EventV2(start_date=start_date, end_date=end_date, table="mentions", translation=False,
                            use_cache=args.use_cache, use_incremental=args.incremental,
-                           force_redownload=args.force_redownload, use_async=args.use_async)
+                           force_redownload=args.force_redownload, use_async=args.use_async,
+                           output_format=args.format)
+        elif args.db == "GEG":
+            db = GEG(start_date=start_date, end_date=end_date,
+                     use_cache=args.use_cache, use_incremental=args.incremental,
+                     force_redownload=args.force_redownload, use_async=args.use_async)
+        elif args.db == "VGEG":
+            db = VGEG(query_date=start_date, domain=args.domain, raw=args.raw,
+                      use_cache=args.use_cache, use_incremental=args.incremental,
+                      force_redownload=args.force_redownload, use_async=args.use_async)
+        elif args.db == "GDG":
+            if args.incremental or args.use_async:
+                print("Warning: GDG does not support --incremental or --async; ignoring those options.")
+            db = GDG(query_date=start_date, use_cache=args.use_cache,
+                     force_redownload=args.force_redownload)
+        elif args.db == "GFG":
+            if args.incremental or args.use_async:
+                print("Warning: GFG does not support --incremental or --async; ignoring those options.")
+            db = GFG(query_date=start_date, use_cache=args.use_cache,
+                     force_redownload=args.force_redownload)
+        elif args.db == "GAL":
+            if args.incremental or args.use_async:
+                print("Warning: GAL does not support --incremental or --async; ignoring those options.")
+            db = GAL(start_date=start_date or "2020-01-01-00-01-00",
+                     end_date=end_date,
+                     use_cache=args.use_cache,
+                     force_redownload=args.force_redownload)
+        elif args.db == "GSG":
+            db = GSG(start_date=start_date,
+                     end_date=end_date,
+                     dataset=args.gsg_dataset,
+                     station=args.domain,
+                     use_cache=args.use_cache,
+                     use_incremental=args.incremental,
+                     force_redownload=args.force_redownload,
+                     use_async=args.use_async)
         
         # Query the database
         print(f"Starting query...\n")
-        results = db.query()
+        if args.db == "GAL" and args.rss:
+            results = db.query_rss_feed()
+        else:
+            results = db.query()
         
         # Check if query was successful
         if isinstance(results, Exception):
@@ -579,13 +754,9 @@ Examples:
         # Export results
         print(f"\nExporting results to {args.output}...")
         
-        if args.format == "csv":
-            results.to_csv(args.output, index=False)
-        elif args.format == "json":
-            results.to_json(args.output, orient='records', force_ascii=False)
-        elif args.format == "txt":
-            print("Warning: TXT format is only supported for single URL download. Using CSV instead.")
-            results.to_csv(args.output, index=False)
+        actual_format = save_results(results, args.output, args.format)
+        if actual_format != args.format:
+            print(f"Saved as {actual_format.upper()} because {args.format.upper()} was not valid for database results.")
         
         print(f"Results saved to: {os.path.abspath(args.output)}")
         print(f"\n{'='*60}")

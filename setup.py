@@ -15,14 +15,19 @@ setup(
     install_requires=[
         "numpy>=2.4.0",
         "pandas>=2.3.3",
-        "requests>=2.22.0",
+        "requests>=2.32.5",
         "tqdm>=4.67.1",
         "newspaper4k>=0.9.4.1",
-        "lxml>=4.4.2",
+        "lxml>=6.0.2",
         "lxml-html-clean>=0.4.3",
         "beautifulsoup4>=4.14.3",
         "fake-useragent>=2.2.0",
-        "nltk>=3.9.2"
+        "nltk>=3.9.2",
+        "tenacity>=9.1.2",
+        "aiohttp>=3.11.0",
+        "aiofiles>=24.1.0",
+        "pyarrow>=19.0.0",
+        "joblib>=1.4.0"
     ],
     entry_points={
         'console_scripts': [
