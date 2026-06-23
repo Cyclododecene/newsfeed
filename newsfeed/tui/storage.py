@@ -6,7 +6,7 @@ import os
 import sqlite3
 import threading
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import gettempdir
 from typing import Any
@@ -19,6 +19,7 @@ class StoredWatchItem:
     id: int
     kind: str
     value: str
+    enabled: bool = True
 
 
 class TuiStorage:
@@ -61,6 +62,15 @@ class TuiStorage:
                     "enrichment_status": "TEXT NOT NULL DEFAULT 'none'",
                     "enriched_at": "TEXT NOT NULL DEFAULT ''",
                     "enrichment_error": "TEXT NOT NULL DEFAULT ''",
+                    "fulltext_retry_count": "INTEGER NOT NULL DEFAULT 0",
+                    "partial_text_path": "TEXT NOT NULL DEFAULT ''",
+                },
+            )
+            ensure_columns(
+                self._conn,
+                "watchlist_items",
+                {
+                    "enabled": "INTEGER NOT NULL DEFAULT 1",
                 },
             )
             ensure_columns(
@@ -72,6 +82,9 @@ class TuiStorage:
                     "tone_threshold": "REAL",
                     "scan_frequency": "INTEGER NOT NULL DEFAULT 300",
                     "last_scanned_at": "TEXT NOT NULL DEFAULT ''",
+                    "state": "TEXT NOT NULL DEFAULT 'active'",
+                    "muted_until": "TEXT NOT NULL DEFAULT ''",
+                    "last_error": "TEXT NOT NULL DEFAULT ''",
                 },
             )
             ensure_columns(
@@ -129,35 +142,43 @@ class TuiStorage:
         with self._lock:
             self._conn.execute(
                 """
-                INSERT OR IGNORE INTO watchlist_items(watchlist_id, kind, value, created_at)
-                VALUES (?, ?, ?, ?)
+                INSERT OR IGNORE INTO watchlist_items(watchlist_id, kind, value, enabled, created_at)
+                VALUES (?, ?, ?, 1, ?)
                 """,
                 (watchlist_id, normalized_kind, normalized_value, now),
             )
             row = self._conn.execute(
                 """
-                SELECT id, kind, value
+                SELECT id, kind, value, enabled
                 FROM watchlist_items
                 WHERE watchlist_id = ? AND kind = ? AND value = ?
                 """,
                 (watchlist_id, normalized_kind, normalized_value),
             ).fetchone()
             self._conn.commit()
-            return StoredWatchItem(id=int(row["id"]), kind=row["kind"], value=row["value"])
+            return StoredWatchItem(
+                id=int(row["id"]),
+                kind=row["kind"],
+                value=row["value"],
+                enabled=bool(row["enabled"]),
+            )
 
     def list_watch_items(self, watchlist: str = "default") -> list[StoredWatchItem]:
         watchlist_id = self.get_or_create_watchlist(watchlist)
         with self._lock:
             rows = self._conn.execute(
                 """
-                SELECT id, kind, value
+                SELECT id, kind, value, enabled
                 FROM watchlist_items
                 WHERE watchlist_id = ?
                 ORDER BY id
                 """,
                 (watchlist_id,),
             ).fetchall()
-        return [StoredWatchItem(id=int(row["id"]), kind=row["kind"], value=row["value"]) for row in rows]
+        return [
+            StoredWatchItem(id=int(row["id"]), kind=row["kind"], value=row["value"], enabled=bool(row["enabled"]))
+            for row in rows
+        ]
 
     def list_watchlists(self) -> list[str]:
         with self._lock:
@@ -167,6 +188,15 @@ class TuiStorage:
     def delete_watch_item(self, item_id: int) -> bool:
         with self._lock:
             cursor = self._conn.execute("DELETE FROM watchlist_items WHERE id = ?", (item_id,))
+            self._conn.commit()
+            return cursor.rowcount > 0
+
+    def set_watch_item_enabled(self, item_id: int, enabled: bool) -> bool:
+        with self._lock:
+            cursor = self._conn.execute(
+                "UPDATE watchlist_items SET enabled = ? WHERE id = ?",
+                (1 if enabled else 0, item_id),
+            )
             self._conn.commit()
             return cursor.rowcount > 0
 
@@ -306,6 +336,7 @@ class TuiStorage:
         result_path: str = "",
         enrichment_status: str = "",
         enrichment_error: str = "",
+        partial_text_path: str = "",
     ) -> str:
         article_id = stable_article_id(article)
         now = utc_now()
@@ -318,9 +349,10 @@ class TuiStorage:
                     id, source_url, title, event_code, event_label, actors, country,
                     published_at, tone, mentions, content_hash, fulltext_path,
                     result_path, enrichment_status, enriched_at, enrichment_error,
+                    fulltext_retry_count, partial_text_path,
                     created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     source_url = excluded.source_url,
                     title = excluded.title,
@@ -344,6 +376,12 @@ class TuiStorage:
                         WHEN excluded.enrichment_status = 'indexed' THEN ''
                         ELSE article_index.enrichment_error
                     END,
+                    fulltext_retry_count = CASE
+                        WHEN excluded.enrichment_status = 'failed' THEN article_index.fulltext_retry_count + 1
+                        WHEN excluded.enrichment_status = 'indexed' THEN article_index.fulltext_retry_count
+                        ELSE article_index.fulltext_retry_count
+                    END,
+                    partial_text_path = COALESCE(NULLIF(excluded.partial_text_path, ''), article_index.partial_text_path),
                     updated_at = excluded.updated_at
                 """,
                 (
@@ -363,6 +401,8 @@ class TuiStorage:
                     status,
                     enriched_at,
                     enrichment_error,
+                    1 if status == "failed" else 0,
+                    partial_text_path,
                     now,
                     now,
                 ),
@@ -399,11 +439,25 @@ class TuiStorage:
             article,
             enrichment_status=status,
             enrichment_error=error,
+            partial_text_path=str(article.raw.get("partial_text_path", "")),
         )
         article.enrichment_status = status
         if error:
             article.error = error
         return article_id
+
+    def save_partial_text(self, article: Article, text: str) -> str:
+        content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        path = self.fulltext_dir / f"{content_hash}.partial.txt"
+        path.write_text(text, encoding="utf-8")
+        article.raw = {**article.raw, "partial_text_path": str(path)}
+        self.upsert_article_index(
+            article,
+            partial_text_path=str(path),
+            enrichment_status="failed",
+            enrichment_error=article.error,
+        )
+        return str(path)
 
     def save_fulltext(self, article: Article, text: str) -> tuple[str, str]:
         content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -498,15 +552,18 @@ class TuiStorage:
                 """
                 INSERT INTO alerts(
                     name, query, country, source, tone_threshold, scan_frequency,
-                    enabled, created_at, updated_at
+                    state, muted_until, last_error, enabled, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, 'active', '', '', ?, ?, ?)
                 ON CONFLICT(name) DO UPDATE SET
                     query = excluded.query,
                     country = excluded.country,
                     source = excluded.source,
                     tone_threshold = excluded.tone_threshold,
                     scan_frequency = excluded.scan_frequency,
+                    state = excluded.state,
+                    muted_until = excluded.muted_until,
+                    last_error = excluded.last_error,
                     enabled = excluded.enabled,
                     updated_at = excluded.updated_at
                 """,
@@ -527,17 +584,53 @@ class TuiStorage:
             return int(row["id"])
 
     def list_alerts(self, enabled_only: bool = False) -> list[dict[str, Any]]:
-        where = "WHERE enabled = 1" if enabled_only else ""
+        where = "WHERE enabled = 1 AND state = 'active'" if enabled_only else ""
         with self._lock:
             rows = self._conn.execute(
                 """
                 SELECT id, name, query, country, source, tone_threshold, scan_frequency,
-                       last_scanned_at, enabled, created_at, updated_at
+                       last_scanned_at, state, muted_until, last_error, enabled, created_at, updated_at
                 FROM alerts
                 """
                 f"{where} ORDER BY name"
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def set_alert_state(
+        self,
+        name: str,
+        state: str,
+        *,
+        muted_until: str = "",
+        last_error: str | None = None,
+    ) -> bool:
+        if state not in {"active", "paused", "muted", "failed", "deleted"}:
+            raise ValueError("Alert state must be active, paused, muted, failed, or deleted.")
+        fields = ["state = ?", "muted_until = ?", "updated_at = ?"]
+        values: list[Any] = [state, muted_until, utc_now()]
+        if last_error is not None:
+            fields.append("last_error = ?")
+            values.append(last_error)
+        values.append(name)
+        with self._lock:
+            cursor = self._conn.execute(
+                f"UPDATE alerts SET {', '.join(fields)} WHERE name = ?",
+                values,
+            )
+            self._conn.commit()
+            return cursor.rowcount > 0
+
+    def mark_alert_failed(self, alert_id: int, error: str) -> None:
+        with self._lock:
+            self._conn.execute(
+                """
+                UPDATE alerts
+                SET state = 'failed', last_error = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (error, utc_now(), alert_id),
+            )
+            self._conn.commit()
 
     def delete_alert(self, name: str) -> bool:
         with self._lock:
@@ -548,7 +641,12 @@ class TuiStorage:
     def check_alerts(self) -> list[dict[str, Any]]:
         hits: list[dict[str, Any]] = []
         for alert in self.list_alerts(enabled_only=True):
-            for article in self.match_alert_articles(alert):
+            try:
+                articles = self.match_alert_articles(alert)
+            except Exception as exc:
+                self.mark_alert_failed(alert["id"], str(exc))
+                continue
+            for article in articles:
                 hit = {
                     "alert_id": alert["id"],
                     "alert_name": alert["name"],
@@ -677,7 +775,12 @@ class TuiStorage:
     def unread_alert_count(self) -> int:
         with self._lock:
             row = self._conn.execute(
-                "SELECT COUNT(*) AS count FROM alert_hits WHERE read_at = ''"
+                """
+                SELECT COUNT(*) AS count
+                FROM alert_hits
+                JOIN alerts ON alerts.id = alert_hits.alert_id
+                WHERE alert_hits.read_at = '' AND alerts.state = 'active'
+                """
             ).fetchone()
         return int(row["count"])
 
@@ -692,6 +795,68 @@ class TuiStorage:
             else:
                 self._conn.execute("UPDATE alert_hits SET read_at = ? WHERE read_at = ''", (now,))
             self._conn.commit()
+
+    def save_library_article(self, article: Article, state: str = "saved", notes: str = "") -> str:
+        article_id = self.upsert_article_index(article)
+        self.set_reading_state(article_id, state, notes=notes)
+        return article_id
+
+    def set_reading_state(self, article_id: str, state: str, notes: str | None = None) -> None:
+        if state not in {"saved", "read", "unread"}:
+            raise ValueError("Reading state must be saved, read, or unread.")
+        now = utc_now()
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT INTO reading_state(article_id, state, last_read_at, notes)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(article_id) DO UPDATE SET
+                    state = excluded.state,
+                    last_read_at = excluded.last_read_at,
+                    notes = CASE
+                        WHEN ? IS NULL THEN reading_state.notes
+                        ELSE excluded.notes
+                    END
+                """,
+                (article_id, state, now, notes or "", notes),
+            )
+            self._conn.commit()
+
+    def set_article_note(self, article_id: str, note: str) -> None:
+        now = utc_now()
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT INTO reading_state(article_id, state, last_read_at, notes)
+                VALUES (?, 'saved', ?, ?)
+                ON CONFLICT(article_id) DO UPDATE SET
+                    notes = excluded.notes,
+                    last_read_at = excluded.last_read_at
+                """,
+                (article_id, now, note),
+            )
+            self._conn.commit()
+
+    def delete_library_item(self, article_id: str) -> bool:
+        with self._lock:
+            cursor = self._conn.execute("DELETE FROM reading_state WHERE article_id = ?", (article_id,))
+            self._conn.commit()
+            return cursor.rowcount > 0
+
+    def list_library(self, limit: int = 50) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT article_index.*, reading_state.state AS reading_state,
+                       reading_state.last_read_at, reading_state.notes
+                FROM reading_state
+                JOIN article_index ON article_index.id = reading_state.article_id
+                ORDER BY reading_state.last_read_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     @property
     def results_dir(self) -> Path:
@@ -720,14 +885,21 @@ class TuiStorage:
             "history_count": history_count,
         }
 
-    def cleanup_cache(self, target: str = "results") -> dict[str, int]:
+    def cleanup_cache(self, target: str = "results", ttl: str = "") -> dict[str, int]:
         normalized = target.lower()
         if normalized == "results":
             directory = self.results_dir
         elif normalized == "fulltext":
             directory = self.fulltext_dir
+        elif normalized == "expired":
+            result = cleanup_expired_files(self.results_dir, ttl)
+            fulltext = cleanup_expired_files(self.fulltext_dir, ttl)
+            return {
+                "removed_files": result["removed_files"] + fulltext["removed_files"],
+                "removed_bytes": result["removed_bytes"] + fulltext["removed_bytes"],
+            }
         else:
-            raise ValueError("CACHE CLEAN target must be RESULTS or FULLTEXT.")
+            raise ValueError("CACHE CLEAN target must be RESULTS, FULLTEXT, or EXPIRED.")
         removed_files = 0
         removed_bytes = 0
         for path in directory.glob("*"):
@@ -758,7 +930,8 @@ class TuiStorage:
         for watchlist in payload.get("watchlists", []):
             name = watchlist.get("name", "default")
             for item in watchlist.get("items", []):
-                self.add_watch_item(item["kind"], item["value"], watchlist=name)
+                stored = self.add_watch_item(item["kind"], item["value"], watchlist=name)
+                self.set_watch_item_enabled(stored.id, bool(item.get("enabled", True)))
                 counts["watchlists"] += 1
         for query in payload.get("saved_queries", []):
             self.save_query(query["name"], query["command"])
@@ -772,6 +945,12 @@ class TuiStorage:
                 tone_threshold=alert.get("tone_threshold"),
                 scan_frequency=int(alert.get("scan_frequency") or 300),
                 enabled=bool(alert.get("enabled", 1)),
+            )
+            self.set_alert_state(
+                alert["name"],
+                alert.get("state", "active"),
+                muted_until=alert.get("muted_until", ""),
+                last_error=alert.get("last_error", ""),
             )
             counts["alerts"] += 1
         for key, value in payload.get("settings", {}).items():
@@ -787,7 +966,7 @@ class TuiStorage:
             {
                 "name": name,
                 "items": [
-                    {"kind": item.kind, "value": item.value}
+                    {"kind": item.kind, "value": item.value, "enabled": item.enabled}
                     for item in self.list_watch_items(name)
                 ],
             }
@@ -861,6 +1040,39 @@ def directory_stats(directory: Path) -> tuple[int, int]:
     return files, total_bytes
 
 
+def cleanup_expired_files(directory: Path, ttl: str) -> dict[str, int]:
+    cutoff = datetime.now(timezone.utc) - parse_ttl(ttl or "7d")
+    removed_files = 0
+    removed_bytes = 0
+    for path in directory.glob("*"):
+        if not path.is_file():
+            continue
+        modified = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+        if modified >= cutoff:
+            continue
+        size = path.stat().st_size
+        path.unlink()
+        removed_files += 1
+        removed_bytes += size
+    return {"removed_files": removed_files, "removed_bytes": removed_bytes}
+
+
+def parse_ttl(value: str) -> timedelta:
+    text = value.strip().lower()
+    if not text:
+        return timedelta(days=7)
+    unit = text[-1]
+    amount_text = text[:-1]
+    if unit not in {"h", "d"} or not amount_text.isdigit():
+        raise ValueError("CACHE CLEAN EXPIRED requires TTL like 12h or 7d.")
+    amount = int(amount_text)
+    if amount <= 0:
+        raise ValueError("CACHE CLEAN EXPIRED TTL must be positive.")
+    if unit == "h":
+        return timedelta(hours=amount)
+    return timedelta(days=amount)
+
+
 def ensure_columns(conn: sqlite3.Connection, table: str, columns: dict[str, str]) -> None:
     existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
     for name, ddl in columns.items():
@@ -887,6 +1099,7 @@ CREATE TABLE IF NOT EXISTS watchlist_items (
     watchlist_id INTEGER NOT NULL REFERENCES watchlists(id) ON DELETE CASCADE,
     kind TEXT NOT NULL,
     value TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL,
     UNIQUE(watchlist_id, kind, value)
 );
@@ -917,6 +1130,9 @@ CREATE TABLE IF NOT EXISTS alerts (
     tone_threshold REAL,
     scan_frequency INTEGER NOT NULL DEFAULT 300,
     last_scanned_at TEXT NOT NULL DEFAULT '',
+    state TEXT NOT NULL DEFAULT 'active',
+    muted_until TEXT NOT NULL DEFAULT '',
+    last_error TEXT NOT NULL DEFAULT '',
     enabled INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -951,6 +1167,8 @@ CREATE TABLE IF NOT EXISTS article_index (
     enrichment_status TEXT NOT NULL DEFAULT 'none',
     enriched_at TEXT NOT NULL DEFAULT '',
     enrichment_error TEXT NOT NULL DEFAULT '',
+    fulltext_retry_count INTEGER NOT NULL DEFAULT 0,
+    partial_text_path TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );

@@ -185,3 +185,50 @@ python -m newsfeed --db EVENT --version V2 --start 2021-01-01 --end 2021-01-02 -
 - [x] Add import/export for configuration, watchlists, saved queries, and alerts
 - [x] Store large historical query results as Parquet
 - [x] Keep the TUI data layer separate enough to support future Web/API/agent frontends
+
+### Post-v1.0 Product Backlog from `news-tui-new.md`
+
+#### P1 Product Gaps
+- [x] Add `NEWS` `LANGUAGE:<code>` filtering
+- [x] Add `NEWS` `SOURCE:<domain>` filtering
+- [x] Add result sorting by tone, source count, and relevance
+- [x] Add `SRC` command for source filtering and source statistics
+- [ ] Let workspace profiles define default `TOP` query templates
+- [ ] Support pinned breaking or high-alert news
+
+#### Reader / Library
+- [x] Save articles to a local library
+- [x] Copy citation or export a Markdown snippet for the selected article
+- [x] Expand reading state to saved/read/unread/notes workflows
+
+#### Timeline / Geo
+- [x] Add `TL MODE:language`
+- [x] Drill down from a timeline bucket to matching news rows
+- [x] Show GEO counts and percentages
+- [x] Drill down from a GEO country/region row to matching news rows
+- [ ] Generate GEO distribution from the active watchlist
+
+#### Watchlist
+- [x] Enable and disable individual watchlist items
+- [ ] Add dedicated watchlist import/export commands
+- [ ] Add watchlist refresh frequency settings
+
+#### Alerts
+- [x] Pause, resume, and mute alerts
+- [x] Add alert states: active, paused, muted, failed, deleted
+- [ ] Add desktop notification or webhook alert delivery
+- [ ] Add advanced alert thresholds such as `min_new_articles` and `tone_below`
+
+#### Briefing
+- [x] Add fixed brief sections: Key Headlines, Watchlist Hits, Notable Trends, and Source Links
+- [x] Clearly separate source facts from system inferences in briefs
+- [ ] Add optional LLM briefing generation without making it the default path
+
+#### Cache / Jobs
+- [x] Clean expired cache entries instead of only deleting all results/fulltext files
+- [x] Add cancellation for long-running queries
+- [x] Add fulltext retry and partial text display for failed extraction
+
+#### Hardening / Distribution
+- [ ] Add `ALRT` as an alias for `ALERT`
+- [x] Implement complete keyboard shortcuts: `/`, `Esc`, `j/k`, `h/l`, `r`, `s`, `a`, `w`, `b`, and `?`

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 from textual import on, work
 from textual.app import App, ComposeResult
@@ -10,11 +11,11 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Footer, Header, Input, Static
 
 from newsfeed.tui.commands import ParsedCommand, parse_command, parse_row_number
-from newsfeed.tui.export import export_articles, export_brief, export_timeline
-from newsfeed.tui.models import Article, TimelinePoint
+from newsfeed.tui.export import citation_markdown, export_articles, export_brief, export_citation, export_timeline
+from newsfeed.tui.models import Article, SourceStat, TimelinePoint
 from newsfeed.tui.services import NewsService, parse_scan_frequency, parse_tone_threshold
 from newsfeed.tui.storage import TuiStorage
-from newsfeed.tui.widgets import DetailPane, NewsTable
+from newsfeed.tui.widgets import ArticleReaderScreen, DetailPane, NewsTable
 
 
 PAGE_SIZE = 25
@@ -56,7 +57,20 @@ class NewsFeedTerminal(App):
     BINDINGS = [
         ("ctrl+c", "quit", "Quit"),
         ("q", "quit", "Quit"),
+        ("/", "focus_command", "Command"),
+        ("escape", "focus_results", "Results"),
+        ("question_mark", "show_help", "Help"),
         ("f5", "run_top", "Top"),
+        ("r", "refresh_results", "Refresh"),
+        ("enter", "open_reader", "Reader"),
+        ("j", "select_next", "Down"),
+        ("k", "select_previous", "Up"),
+        ("h", "prev_page", "Prev"),
+        ("l", "next_page", "Next"),
+        ("s", "save_article", "Save"),
+        ("a", "show_alert_hits", "Alerts"),
+        ("w", "run_watchlist_news", "Watch"),
+        ("b", "create_current_brief", "Brief"),
         ("pagedown", "next_page", "Next"),
         ("pageup", "prev_page", "Prev"),
     ]
@@ -67,6 +81,7 @@ class NewsFeedTerminal(App):
         self.all_articles: list[Article] = []
         self.articles: list[Article] = []
         self.timeline_points: list[TimelinePoint] = []
+        self.current_view = "articles"
         self.selected_article: Article | None = None
         self.current_order = "newest"
         self.current_page = 0
@@ -76,6 +91,8 @@ class NewsFeedTerminal(App):
         self.enrichment_concurrency = ENRICHMENT_CONCURRENCY
         self.alert_scan_interval = 30
         self.alert_count = 0
+        self.last_refresh_command: ParsedCommand | None = None
+        self.reader_screen: ArticleReaderScreen | None = None
         self._alert_scan_active = False
         self._enrichment_queue: list[str] = []
         self._enrichment_inflight: set[str] = set()
@@ -100,6 +117,58 @@ class NewsFeedTerminal(App):
     def action_run_top(self) -> None:
         self.dispatch_command(parse_command("TOP"))
 
+    def action_focus_command(self) -> None:
+        command_input = self.query_one("#command", Input)
+        command_input.focus()
+        command_input.cursor_position = len(command_input.value)
+        self.set_status("Command focused.")
+
+    def action_focus_results(self) -> None:
+        if self.cancel_active_work():
+            return
+        self.query_one(NewsTable).focus()
+        self.set_status("Results focused.")
+
+    def action_show_help(self) -> None:
+        self.query_one(DetailPane).show_help()
+        self.set_status("Help ready.")
+
+    def action_refresh_results(self) -> None:
+        command = self.last_refresh_command or parse_command("TOP")
+        self.dispatch_command(parse_command(command.raw))
+
+    def action_select_next(self) -> None:
+        self.move_result_cursor("down")
+
+    def action_select_previous(self) -> None:
+        self.move_result_cursor("up")
+
+    def action_open_reader(self) -> None:
+        if self.current_view in {"timeline", "geo"}:
+            row_key = self.current_table_row_key()
+            if row_key:
+                self.open_timeline_point_key(row_key)
+                return
+        self.open_reader_for_selected()
+
+    def action_save_article(self) -> None:
+        self.dispatch_command(parse_command("LIB SAVE"))
+
+    def action_show_alert_hits(self) -> None:
+        self.dispatch_command(parse_command("ALERT HITS"))
+
+    def action_run_watchlist_news(self) -> None:
+        self.dispatch_command(parse_command("WATCH NEWS"))
+
+    def action_create_current_brief(self) -> None:
+        path = self.default_brief_path()
+        try:
+            output_path = self.create_brief(parse_command(f"BRIEF CURRENT PATH:{path}"))
+        except Exception as exc:
+            self.set_error(str(exc))
+            return
+        self.set_status(f"Brief exported {output_path}.")
+
     @on(Input.Submitted, "#command")
     def on_command_submitted(self, event: Input.Submitted) -> None:
         event.input.value = ""
@@ -112,14 +181,19 @@ class NewsFeedTerminal(App):
 
     @on(NewsTable.RowHighlighted)
     def on_row_highlighted(self, event: NewsTable.RowHighlighted) -> None:
+        if self.current_view != "articles":
+            return
         row_key = str(event.row_key.value)
         self.open_article_key(row_key)
 
     @on(NewsTable.RowSelected)
     def on_row_selected(self, event: NewsTable.RowSelected) -> None:
         row_key = str(event.row_key.value)
+        if self.current_view in {"timeline", "geo"}:
+            self.open_timeline_point_key(row_key)
+            return
         if self.open_article_key(row_key):
-            self.run_fulltext()
+            self.open_reader_for_selected()
 
     @on(NewsTable.HeaderSelected)
     def on_header_selected(self, event: NewsTable.HeaderSelected) -> None:
@@ -137,24 +211,34 @@ class NewsFeedTerminal(App):
         elif name == "QUIT":
             self.exit()
         elif name == "TOP":
+            self.remember_refresh_command(command)
             self.run_top(command)
         elif name == "NEWS":
+            self.remember_refresh_command(command)
             self.run_news(command)
+        elif name == "SRC":
+            self.dispatch_src(command)
         elif name == "GEO":
+            self.remember_refresh_command(command)
             self.run_geo(command)
         elif name == "TL":
+            self.remember_refresh_command(command)
             self.run_timeline(command)
         elif name == "READ":
-            self.open_row(parse_row_number(command))
+            self.open_row(parse_row_number(command), open_reader=True)
         elif name == "FULLTEXT":
-            self.run_fulltext()
+            self.open_reader_for_selected()
+            self.request_reader_fulltext()
         elif name == "EXPORT":
             self.export_current(command)
         elif name == "BRIEF":
             self.run_brief(command)
+        elif name == "CITE":
+            self.dispatch_cite(command)
         elif name == "WATCH":
             self.dispatch_watch(command)
         elif name == "SEARCH":
+            self.remember_refresh_command(command)
             self.run_search(command)
         elif name == "ALERT":
             self.dispatch_alert(command)
@@ -174,6 +258,10 @@ class NewsFeedTerminal(App):
             self.dispatch_cache(command)
         elif name == "CONFIG":
             self.dispatch_config(command)
+        elif name == "LIB":
+            self.dispatch_library(command)
+        elif name == "CANCEL":
+            self.cancel_active_work()
 
     @work(thread=True)
     def run_top(self, command: ParsedCommand) -> None:
@@ -205,7 +293,17 @@ class NewsFeedTerminal(App):
         except Exception as exc:
             self.call_from_thread(self.set_error, str(exc))
             return
-        self.call_from_thread(self.apply_timeline, points)
+        self.call_from_thread(self.apply_timeline, points, "geo")
+
+    @work(thread=True)
+    def run_source_stats(self, command: ParsedCommand) -> None:
+        self.call_from_thread(self.set_loading, "Loading source stats...")
+        try:
+            stats = self.service.source_stats(command)
+        except Exception as exc:
+            self.call_from_thread(self.set_error, str(exc))
+            return
+        self.call_from_thread(self.apply_source_stats, stats)
 
     @work(thread=True)
     def run_timeline(self, command: ParsedCommand) -> None:
@@ -229,6 +327,8 @@ class NewsFeedTerminal(App):
         self.call_from_thread(self.set_loading, "Loading full text...")
         target_article.enrichment_status = "pending"
         self.call_from_thread(self.refresh_article_table, target_article)
+        self.call_from_thread(self.show_article_preview, target_article)
+        self.call_from_thread(self.update_reader, target_article)
         article = self.service.fetch_fulltext(target_article)
         self.call_from_thread(self.apply_fulltext, article)
 
@@ -321,12 +421,26 @@ class NewsFeedTerminal(App):
                 item = self.service.delete_watch_item(int(command.args[1]))
                 self.query_one(DetailPane).show_watchlist(self.service.watchlist_labels())
                 self.set_status(f"Deleted watch item {item.kind}:{item.value}.")
+            elif action in {"ENABLE", "DISABLE"}:
+                if len(command.args) < 2:
+                    raise ValueError(f"WATCH {action} requires an item number.")
+                item = self.service.set_watch_item_enabled(int(command.args[1]), action == "ENABLE")
+                self.query_one(DetailPane).show_watchlist(self.service.watchlist_labels())
+                self.set_status(f"Watch item {item.index} {'enabled' if item.enabled else 'disabled'}.")
             elif action == "NEWS":
+                self.remember_refresh_command(command)
                 self.run_watch_news(command)
             else:
-                raise ValueError("WATCH requires ADD, LIST, DELETE, or NEWS.")
+                raise ValueError("WATCH requires ADD, LIST, DELETE, ENABLE, DISABLE, or NEWS.")
         except ValueError as exc:
             self.set_error(str(exc))
+
+    def dispatch_src(self, command: ParsedCommand) -> None:
+        if command.args and command.args[0].upper() == "CURRENT":
+            self.apply_source_stats(self.service.source_stats_from_articles(self.all_articles or self.articles))
+            return
+        self.remember_refresh_command(command)
+        self.run_source_stats(command)
 
     def dispatch_save(self, command: ParsedCommand) -> None:
         if not command.args:
@@ -412,7 +526,7 @@ class NewsFeedTerminal(App):
                 self.query_one(DetailPane).update("Query History\n" + "\n".join(labels))
                 self.set_status("Query history loaded.")
             elif action == "CLEAN":
-                target = command.args[1] if len(command.args) > 1 else "results"
+                target = " ".join(command.args[1:]) if len(command.args) > 1 else "results"
                 result = self.service.cleanup_cache(target)
                 self.set_status(f"Cache cleaned {result['removed_files']} files.")
             else:
@@ -441,9 +555,66 @@ class NewsFeedTerminal(App):
         except ValueError as exc:
             self.set_error(str(exc))
 
+    def dispatch_library(self, command: ParsedCommand) -> None:
+        if not command.args:
+            self.set_error("LIB requires SAVE, LIST, DELETE, MARK, or NOTE.")
+            return
+        action = command.args[0].upper()
+        try:
+            if action == "SAVE":
+                if self.selected_article is None:
+                    raise ValueError("Select an article first.")
+                article_id = self.service.save_to_library(self.selected_article)
+                self.set_status(f"Saved article {article_id}.")
+            elif action == "LIST":
+                self.apply_articles(self.service.list_library())
+                self.set_status("Library loaded.")
+            elif action == "DELETE":
+                if len(command.args) < 2:
+                    raise ValueError("LIB DELETE requires an item number or article id.")
+                deleted = self.service.delete_library_item(command.args[1])
+                self.set_status("Library item deleted." if deleted else "Library item not found.")
+            elif action == "MARK":
+                if self.selected_article is None:
+                    raise ValueError("Select an article first.")
+                if len(command.args) < 2:
+                    raise ValueError("LIB MARK requires read or unread.")
+                state = command.args[1].lower()
+                self.service.mark_library_article(self.selected_article, state)
+                self.query_one(DetailPane).show_article(self.selected_article)
+                self.set_status(f"Marked article {state}.")
+            elif action == "NOTE":
+                if self.selected_article is None:
+                    raise ValueError("Select an article first.")
+                note = " ".join(command.args[1:]).strip()
+                if not note:
+                    raise ValueError("LIB NOTE requires note text.")
+                self.service.note_library_article(self.selected_article, note)
+                self.query_one(DetailPane).show_article(self.selected_article)
+                self.set_status("Article note saved.")
+            else:
+                raise ValueError("LIB requires SAVE, LIST, DELETE, MARK, or NOTE.")
+        except ValueError as exc:
+            self.set_error(str(exc))
+
+    def dispatch_cite(self, command: ParsedCommand) -> None:
+        if self.selected_article is None:
+            self.set_error("Select an article first.")
+            return
+        path = command.options.get("PATH")
+        try:
+            if path:
+                output = export_citation(self.selected_article, path)
+                self.set_status(f"Citation exported {output}.")
+            else:
+                self.query_one(DetailPane).update(citation_markdown(self.selected_article))
+                self.set_status("Citation ready.")
+        except Exception as exc:
+            self.set_error(str(exc))
+
     def dispatch_alert(self, command: ParsedCommand) -> None:
         if not command.args:
-            self.set_error("ALERT requires ADD, LIST, DELETE, CHECK, or HITS.")
+            self.set_error("ALERT requires ADD, LIST, DELETE, CHECK, HITS, PAUSE, RESUME, MUTE, or STATE.")
             return
 
         action = command.args[0].upper()
@@ -474,19 +645,46 @@ class NewsFeedTerminal(App):
                 self.query_one(DetailPane).show_alerts(self.service.list_alerts())
                 self.set_status("Alert deleted." if deleted else "Alert not found.")
             elif action == "CHECK":
+                self.remember_refresh_command(command)
                 self.run_alert_check()
             elif action == "HITS":
+                self.remember_refresh_command(command)
                 self.run_alert_hits()
+            elif action == "PAUSE":
+                if len(command.args) < 2:
+                    raise ValueError("ALERT PAUSE requires an alert name.")
+                updated = self.service.pause_alert(command.args[1])
+                self.query_one(DetailPane).show_alerts(self.service.list_alerts())
+                self.set_status("Alert paused." if updated else "Alert not found.")
+            elif action == "RESUME":
+                if len(command.args) < 2:
+                    raise ValueError("ALERT RESUME requires an alert name.")
+                updated = self.service.resume_alert(command.args[1])
+                self.query_one(DetailPane).show_alerts(self.service.list_alerts())
+                self.set_status("Alert resumed." if updated else "Alert not found.")
+            elif action == "MUTE":
+                if len(command.args) < 3:
+                    raise ValueError("ALERT MUTE requires an alert name and window.")
+                updated = self.service.mute_alert(command.args[1], command.args[2])
+                self.query_one(DetailPane).show_alerts(self.service.list_alerts())
+                self.set_status("Alert muted." if updated else "Alert not found.")
+            elif action == "STATE":
+                if len(command.args) < 3:
+                    raise ValueError("ALERT STATE requires an alert name and state.")
+                updated = self.service.set_alert_state(command.args[1], command.args[2].lower())
+                self.query_one(DetailPane).show_alerts(self.service.list_alerts())
+                self.set_status("Alert state updated." if updated else "Alert not found.")
             else:
-                raise ValueError("ALERT requires ADD, LIST, DELETE, CHECK, or HITS.")
+                raise ValueError("ALERT requires ADD, LIST, DELETE, CHECK, HITS, PAUSE, RESUME, MUTE, or STATE.")
         except ValueError as exc:
             self.set_error(str(exc))
 
     def apply_articles(self, articles: list[Article], auto_enrich: bool = False) -> None:
         self.timeline_points = []
+        self.current_view = "articles"
         self.auto_enrich_pages = auto_enrich
         self.current_page = 0
-        self.all_articles = sort_articles_by_time(articles, self.current_order)
+        self.all_articles = list(articles)
         table = self.query_one(NewsTable)
         table.reset_article_columns()
         if not self.all_articles:
@@ -517,10 +715,11 @@ class NewsFeedTerminal(App):
         self.current_page = 0
         self.render_current_page(auto_enrich=self.auto_enrich_pages)
 
-    def apply_timeline(self, points: list[TimelinePoint]) -> None:
+    def apply_timeline(self, points: list[TimelinePoint], view: str = "timeline") -> None:
         self.all_articles = []
         self.articles = []
         self.timeline_points = points
+        self.current_view = view
         self.selected_article = None
         self.auto_enrich_pages = False
         table = self.query_one(NewsTable)
@@ -528,25 +727,36 @@ class NewsFeedTerminal(App):
         self.query_one(DetailPane).show_timeline(points)
         self.set_status(f"{len(points)} timeline points loaded.")
 
+    def apply_source_stats(self, stats: list[SourceStat]) -> None:
+        self.all_articles = []
+        self.articles = []
+        self.timeline_points = []
+        self.current_view = "source_stats"
+        self.selected_article = None
+        table = self.query_one(NewsTable)
+        table.load_source_stats(stats)
+        lines = ["Sources"]
+        lines.extend(f"{stat.source}: {stat.count} avg tone {stat.avg_tone:.3f}" for stat in stats[:40])
+        self.query_one(DetailPane).update("\n".join(lines) if stats else "No source stats.")
+        self.set_status(f"{len(stats)} source rows loaded.")
+
     def apply_fulltext(self, article: Article) -> None:
         self.selected_article = article
         self.refresh_article_table(article)
+        self.update_reader(article)
+        self.query_one(DetailPane).show_article(article)
         if article.fulltext:
-            self.query_one(DetailPane).show_fulltext(article)
             path = article.raw.get("fulltext_path", "")
             self.set_status(f"Full text cached at {path}." if path else "Full text loaded.")
         else:
-            self.query_one(DetailPane).show_article(article)
             self.set_status(article.error)
 
     def apply_background_fulltext(self, article: Article) -> None:
         selected_key = self.selected_article.row_key if self.selected_article else ""
         self.refresh_article_table(article)
         if selected_key and article.row_key == selected_key:
-            if article.fulltext:
-                self.query_one(DetailPane).show_fulltext(article)
-            else:
-                self.query_one(DetailPane).show_article(article)
+            self.query_one(DetailPane).show_article(article)
+        self.update_reader(article)
         if article.enrichment_status == "failed":
             self.set_status(f"Background enrichment failed for row {article.index}: {article.error}")
         else:
@@ -603,9 +813,8 @@ class NewsFeedTerminal(App):
         self.start_next_enrichment()
 
     def render_current_page(self, auto_enrich: bool = False) -> None:
-        page_count = total_pages(self.all_articles, self.page_size)
-        self.current_page = clamp_page(self.current_page, page_count)
-        self.articles = article_page(self.all_articles, self.current_page, self.page_size)
+        self.current_page = 0
+        self.articles = list(self.all_articles)
         for index, article in enumerate(self.articles, start=1):
             article.index = index
         table = self.query_one(NewsTable)
@@ -614,10 +823,9 @@ class NewsFeedTerminal(App):
         self.selected_article = self.articles[0] if self.articles else None
         if self.selected_article is not None:
             self.query_one(DetailPane).show_article(self.selected_article)
-        start, end = page_bounds(len(self.all_articles), self.current_page, self.page_size)
-        status = f"Rows {start}-{end} of {len(self.all_articles)}. Page {self.current_page + 1}/{page_count}."
+        status = f"Rows 1-{len(self.articles)} of {len(self.all_articles)}. Continuous stream."
         if auto_enrich:
-            queued = self.enqueue_background_enrichment(self.articles)
+            queued = self.enqueue_background_enrichment(self.articles[: self.enrichment_limit])
             if queued:
                 status += f" Enriching {queued} articles."
         self.set_status(status)
@@ -629,18 +837,10 @@ class NewsFeedTerminal(App):
         self.prev_page()
 
     def next_page(self) -> None:
-        if self.current_page + 1 >= total_pages(self.all_articles, self.page_size):
-            self.set_status("Already on last page.")
-            return
-        self.current_page += 1
-        self.render_current_page(auto_enrich=self.auto_enrich_pages)
+        self.move_result_cursor("down", steps=self.page_size)
 
     def prev_page(self) -> None:
-        if self.current_page <= 0:
-            self.set_status("Already on first page.")
-            return
-        self.current_page -= 1
-        self.render_current_page(auto_enrich=self.auto_enrich_pages)
+        self.move_result_cursor("up", steps=self.page_size)
 
     def open_page(self, command: ParsedCommand) -> None:
         if not command.args:
@@ -651,22 +851,53 @@ class NewsFeedTerminal(App):
         except ValueError:
             self.set_error("PAGE number must be an integer.")
             return
-        page_count = total_pages(self.all_articles, self.page_size)
-        if page_number < 1 or page_number > page_count:
-            self.set_error(f"Page {page_number} is not available.")
+        if page_number < 1:
+            self.set_error("PAGE number must be 1 or greater.")
             return
-        self.current_page = page_number - 1
-        self.render_current_page(auto_enrich=self.auto_enrich_pages)
+        target_row = ((page_number - 1) * self.page_size) + 1
+        if target_row > len(self.articles):
+            self.set_error(f"Stream row {target_row} is not available.")
+            return
+        self.open_row(target_row)
 
-    def open_row(self, row_number: int) -> None:
+    def move_result_cursor(self, direction: str, steps: int = 1) -> None:
+        table = self.query_one(NewsTable)
+        table.focus()
+        if not self.articles:
+            self.set_status("No rows to select.")
+            return
+        for _ in range(max(steps, 1)):
+            if direction == "down":
+                table.action_cursor_down()
+            else:
+                table.action_cursor_up()
+        row_key = self.current_table_row_key()
+        if row_key:
+            self.open_article_key(row_key)
+
+    def current_table_row_key(self) -> str:
+        table = self.query_one(NewsTable)
+        if table.row_count == 0:
+            return ""
+        try:
+            cell_key = table.coordinate_to_cell_key(table.cursor_coordinate)
+        except Exception:
+            return ""
+        return str(cell_key.row_key.value)
+
+    def open_row(self, row_number: int, open_reader: bool = False) -> None:
         if row_number < 1 or row_number > len(self.articles):
             self.set_error(f"Row {row_number} is not available.")
             return
         self.selected_article = self.articles[row_number - 1]
         self.show_selected_article()
         self.set_status(f"Opened row {row_number}.")
+        if open_reader:
+            self.open_reader_for_selected()
 
     def open_article_key(self, row_key: str) -> bool:
+        if self.current_view in {"timeline", "geo"}:
+            return self.open_timeline_point_key(row_key)
         article = find_article_by_key(self.articles, row_key)
         if article is None:
             self.set_error("Selected row is not available.")
@@ -676,16 +907,115 @@ class NewsFeedTerminal(App):
         self.set_status(f"Opened row {article.index}.")
         return True
 
+    def open_timeline_point_key(self, row_key: str) -> bool:
+        try:
+            index = int(row_key)
+        except ValueError:
+            self.set_error("Selected aggregate row is not available.")
+            return False
+        if index < 1 or index > len(self.timeline_points):
+            self.set_error(f"Aggregate row {index} is not available.")
+            return False
+        point = self.timeline_points[index - 1]
+        if self.current_view == "geo":
+            self.run_geo_drilldown(point)
+        else:
+            self.run_timeline_drilldown(point)
+        return True
+
+    @work(thread=True)
+    def run_timeline_drilldown(self, point: TimelinePoint) -> None:
+        self.call_from_thread(self.set_loading, f"Loading TL bucket {point.timestamp}...")
+        try:
+            articles = self.service.timeline_drilldown(point)
+            self.archive_query_result(parse_command(f"TL {point.timestamp}"), articles)
+        except Exception as exc:
+            self.call_from_thread(self.set_error, str(exc))
+            return
+        self.call_from_thread(self.apply_articles, articles, True)
+
+    @work(thread=True)
+    def run_geo_drilldown(self, point: TimelinePoint) -> None:
+        self.call_from_thread(self.set_loading, f"Loading GEO {point.timestamp}...")
+        try:
+            articles = self.service.geo_drilldown(point)
+            self.archive_query_result(parse_command(f"GEO {point.timestamp}"), articles)
+        except Exception as exc:
+            self.call_from_thread(self.set_error, str(exc))
+            return
+        self.call_from_thread(self.apply_articles, articles, True)
+
+    def cancel_active_work(self) -> bool:
+        worker_count = len(getattr(self.workers, "_workers", []))
+        if worker_count == 0 and not self._enrichment_queue and not self._enrichment_inflight and self._enrichment_active == 0:
+            return False
+        self._enrichment_queue.clear()
+        self._enrichment_inflight.clear()
+        self._enrichment_active = 0
+        try:
+            self.workers.cancel_all()
+        except Exception:
+            return False
+        self.set_status("Cancelled active work.")
+        return True
+
     def show_selected_article(self) -> None:
         if self.selected_article is None:
             return
-        article = self.selected_article
-        if article.query == "ALERT" and article.raw.get("fulltext_path"):
-            cached = self.service.fetch_fulltext(article)
-            if cached.fulltext:
-                self.query_one(DetailPane).show_fulltext(cached)
-                return
+        self.show_article_preview(self.selected_article)
+
+    def show_article_preview(self, article: Article) -> None:
         self.query_one(DetailPane).show_article(article)
+
+    def open_reader_for_selected(self) -> None:
+        if self.selected_article is None:
+            self.set_error("Select an article first.")
+            return
+        article = self.load_cached_fulltext(self.selected_article)
+        if self.reader_screen is not None and self.reader_screen.is_mounted:
+            self.reader_screen.update_article(article)
+            self.set_status(f"Reader opened row {article.index}.")
+            return
+        screen = ArticleReaderScreen(article)
+        self.reader_screen = screen
+        self.push_screen(screen)
+        self.set_status(f"Reader opened row {article.index}.")
+
+    def close_reader(self, screen: ArticleReaderScreen) -> None:
+        if self.reader_screen is screen:
+            self.reader_screen = None
+        screen.dismiss()
+        self.query_one(NewsTable).focus()
+        self.set_status("Reader closed.")
+
+    def reader_closed(self, screen: ArticleReaderScreen) -> None:
+        if self.reader_screen is screen:
+            self.reader_screen = None
+        try:
+            self.query_one(NewsTable).focus()
+        except Exception:
+            pass
+
+    def load_cached_fulltext(self, article: Article) -> Article:
+        if not article.fulltext and self.service.storage is not None:
+            self.service.storage.load_cached_fulltext(article)
+            self.refresh_article_table(article)
+        return article
+
+    def request_reader_fulltext(self, row_key: str = "") -> None:
+        if row_key:
+            article = find_article_by_key(self.all_articles, row_key) or find_article_by_key(self.articles, row_key)
+            if article is not None:
+                self.selected_article = article
+        self.run_fulltext()
+
+    def update_reader(self, article: Article) -> None:
+        screen = self.reader_screen
+        if screen is None or not screen.is_mounted:
+            return
+        if screen.article.row_key and article.row_key and screen.article.row_key != article.row_key:
+            return
+        screen.update_article(article)
 
     def export_current(self, command: ParsedCommand) -> None:
         output_format = command.options.get("FORMAT", "csv")
@@ -722,6 +1052,18 @@ class NewsFeedTerminal(App):
         else:
             raise ValueError("BRIEF requires CURRENT, ALERTS, or WATCH.")
         return export_brief(articles, path, title=title)
+
+    def default_brief_path(self) -> Path:
+        storage = self.service.storage
+        base_path = storage.cache_dir if storage is not None else Path("/tmp") / "newsfeed"
+        brief_dir = base_path / "briefs"
+        brief_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"brief-{datetime_key().replace(':', '-')}.md"
+        return brief_dir / filename
+
+    def remember_refresh_command(self, command: ParsedCommand) -> None:
+        if command.raw:
+            self.last_refresh_command = command
 
     def current_layout(self) -> dict[str, object]:
         return {
@@ -825,26 +1167,21 @@ def enrichment_candidates(articles: list[Article], limit: int) -> list[Article]:
 
 
 def article_page(articles: list[Article], page: int, page_size: int = PAGE_SIZE) -> list[Article]:
-    start = max(page, 0) * page_size
-    return articles[start : start + page_size]
+    return list(articles)
 
 
 def total_pages(articles: list[Article], page_size: int = PAGE_SIZE) -> int:
-    if not articles:
-        return 1
-    return ((len(articles) - 1) // page_size) + 1
+    return 1
 
 
 def clamp_page(page: int, page_count: int) -> int:
-    return min(max(page, 0), max(page_count - 1, 0))
+    return 0
 
 
 def page_bounds(total: int, page: int, page_size: int = PAGE_SIZE) -> tuple[int, int]:
     if total == 0:
         return 0, 0
-    start = (page * page_size) + 1
-    end = min(start + page_size - 1, total)
-    return start, end
+    return 1, total
 
 
 def datetime_key() -> str:

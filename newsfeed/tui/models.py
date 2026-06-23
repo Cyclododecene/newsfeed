@@ -41,6 +41,14 @@ class TimelinePoint:
     raw: dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass
+class SourceStat:
+    index: int
+    source: str
+    count: int
+    avg_tone: float
+
+
 def _value(row: dict[str, Any], *names: str) -> str:
     for name in names:
         if name in row and row[name] is not None:

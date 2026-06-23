@@ -9,12 +9,14 @@ from datetime import datetime, timedelta, timezone
 COMMANDS = {
     "TOP",
     "NEWS",
+    "SRC",
     "GEO",
     "READ",
     "TL",
     "FULLTEXT",
     "EXPORT",
     "BRIEF",
+    "CITE",
     "HELP",
     "QUIT",
     "WATCH",
@@ -28,6 +30,8 @@ COMMANDS = {
     "WORKSPACE",
     "CACHE",
     "CONFIG",
+    "LIB",
+    "CANCEL",
 }
 
 
@@ -99,8 +103,8 @@ def parse_limit(value: str | None, default: int = 50) -> int:
 
 def parse_order(value: str | None, default: str = "newest") -> str:
     order = (value or default).strip().lower()
-    if order not in {"newest", "oldest"}:
-        raise ValueError("ORDER must be newest or oldest.")
+    if order not in {"newest", "oldest", "tone", "sources", "relevance"}:
+        raise ValueError("ORDER must be newest, oldest, tone, sources, or relevance.")
     return order
 
 

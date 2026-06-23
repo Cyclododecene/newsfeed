@@ -80,12 +80,78 @@ def export_brief(articles: list[Article], path: str, *, title: str = "NewsFeed B
         f"Generated: {generated_at}",
         f"Items: {len(articles)}",
         "",
+        "## Key Headlines",
+        "",
     ]
     if not articles:
         lines.extend(["No articles.", ""])
+    else:
+        for article in articles[:10]:
+            event = article.event_label or article.event_code or article.title or "Untitled"
+            lines.append(f"- {article.display_time or article.published_at} | {article.country or '-'} | {event}")
+        lines.append("")
+
+    lines.extend(["## Watchlist Hits", ""])
+    watch_hits = [article for article in articles if article.match_reason or article.watch_hits]
+    if watch_hits:
+        for article in watch_hits[:20]:
+            event = article.event_label or article.event_code or article.title or "Untitled"
+            lines.append(f"- {event}: {article.match_reason or ', '.join(article.watch_hits)}")
+    else:
+        lines.append("No watchlist or alert matches.")
+    lines.append("")
+
+    lines.extend(["## Notable Trends", "", "System Inferences:"])
+    if articles:
+        country_counts = top_counts(article.country or "unknown" for article in articles)
+        tone_values = [safe_float(article.tone) for article in articles if article.tone not in {"", None}]
+        lines.append(f"- Most frequent countries: {', '.join(country_counts) if country_counts else 'none'}")
+        if tone_values:
+            avg_tone = sum(tone_values) / len(tone_values)
+            lines.append(f"- Average tone across listed articles: {avg_tone:.3f}")
+        else:
+            lines.append("- Average tone unavailable.")
+    else:
+        lines.append("- No trend inference because there are no articles.")
+    lines.append("")
+
+    lines.extend(["## Source Links", "", "Source Facts:"])
+    if articles:
+        for article in articles:
+            event = article.event_label or article.event_code or article.title or "Untitled"
+            lines.append(f"- {event}: {article.url or '-'}")
+    else:
+        lines.append("- No source links.")
+    lines.append("")
+
+    lines.extend(["## Article Details", "", "Source Facts:"])
     for article in articles:
         lines.extend(article_brief_lines(article))
     output_path.write_text("\n".join(lines), encoding="utf-8")
+    return output_path
+
+
+def citation_markdown(article: Article, excerpt_chars: int = 500) -> str:
+    event = article.event_label or article.event_code or article.title or "Untitled"
+    path = str(article.raw.get("fulltext_path", ""))
+    lines = [
+        f"## {event}",
+        "",
+        f"- Time: {article.display_time or article.published_at}",
+        f"- SourceURL: {article.url}",
+        f"- Fulltext: {path or '-'}",
+    ]
+    excerpt = cached_excerpt(article, excerpt_chars)
+    if excerpt:
+        lines.extend(["", "Excerpt:", "", excerpt])
+    lines.append("")
+    return "\n".join(lines)
+
+
+def export_citation(article: Article, path: str) -> Path:
+    output_path = Path(path).expanduser()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(citation_markdown(article), encoding="utf-8")
     return output_path
 
 
@@ -128,3 +194,18 @@ def cached_excerpt(article: Article, max_chars: int = 800) -> str:
 
 def normalize_excerpt(text: str) -> str:
     return " ".join(text.split())
+
+
+def top_counts(values) -> list[str]:
+    counts: dict[str, int] = {}
+    for value in values:
+        counts[str(value)] = counts.get(str(value), 0) + 1
+    rows = sorted(counts.items(), key=lambda item: item[1], reverse=True)
+    return [f"{value} ({count})" for value, count in rows[:5]]
+
+
+def safe_float(value: str) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0

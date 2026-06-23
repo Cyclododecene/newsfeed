@@ -12,7 +12,7 @@ import pandas as pd
 
 from newsfeed.news.db.events import EventV2
 from newsfeed.tui.commands import ParsedCommand, parse_limit, parse_order, parse_since_window
-from newsfeed.tui.models import Article, TimelinePoint, article_from_event_record, article_from_index_record
+from newsfeed.tui.models import Article, SourceStat, TimelinePoint, article_from_event_record, article_from_index_record
 from newsfeed.tui.storage import TuiStorage
 from newsfeed.utils.fulltext import download
 
@@ -44,9 +44,11 @@ class WatchItem:
     kind: str
     value: str
     storage_id: int | None = None
+    enabled: bool = True
 
     def label(self) -> str:
-        return f"{self.index}. {self.kind}:{self.value}"
+        state = "on" if self.enabled else "off"
+        return f"{self.index}. [{state}] {self.kind}:{self.value}"
 
 
 def query_event_v2_sequential(event_query: Any) -> pd.DataFrame | Exception:
@@ -112,6 +114,7 @@ class NewsService:
     default_article_limit: int = DEFAULT_ARTICLE_LIMIT
     event_lag_minutes: int = DEFAULT_EVENT_LAG_MINUTES
     event_fallback_lookback: int = DEFAULT_EVENT_FALLBACK_LOOKBACK
+    fulltext_retry_limit: int = 2
     watchlist: list[WatchItem] = field(default_factory=list)
     storage: TuiStorage | None = None
     workspace_name: str = "default"
@@ -124,6 +127,8 @@ class NewsService:
     def top(self, command: ParsedCommand) -> list[Article]:
         window = command.options.get("SINCE", "6h")
         countries = _split_codes(command.options.get("COUNTRY"))
+        languages = _split_codes(command.options.get("LANGUAGE"))
+        sources = _split_values(command.options.get("SOURCE"))
         limit = parse_limit(command.options.get("LIMIT"), default=self.default_article_limit)
         order = parse_order(command.options.get("ORDER"))
         return self.search_articles(
@@ -132,7 +137,9 @@ class NewsService:
             countries,
             limit,
             order,
-            ranked="ORDER" not in command.options,
+            ranked="ORDER" not in command.options or order == "relevance",
+            languages=languages,
+            sources=sources,
         )
 
     def news(self, command: ParsedCommand) -> list[Article]:
@@ -140,30 +147,92 @@ class NewsService:
         if not query:
             raise ValueError('NEWS requires a query, for example NEWS "oil prices" SINCE:6h.')
         countries = _split_codes(command.options.get("COUNTRY"))
+        languages = _split_codes(command.options.get("LANGUAGE"))
+        sources = _split_values(command.options.get("SOURCE"))
         limit = parse_limit(command.options.get("LIMIT"), default=self.default_article_limit)
         order = parse_order(command.options.get("ORDER"))
-        return self.search_articles(query, command.options.get("SINCE", "6h"), countries, limit, order)
+        return self.search_articles(
+            query,
+            command.options.get("SINCE", "6h"),
+            countries,
+            limit,
+            order,
+            ranked=order == "relevance",
+            languages=languages,
+            sources=sources,
+        )
 
     def timeline(self, command: ParsedCommand) -> list[TimelinePoint]:
-        dataframe = self._query_events(command.options.get("SINCE", "24h"))
+        window = command.options.get("SINCE", "24h")
+        dataframe = self._query_events(window)
         dataframe = filter_events(
             dataframe,
             command.query or self.default_top_query,
             _split_codes(command.options.get("COUNTRY")),
+            _split_codes(command.options.get("LANGUAGE")),
+            _split_values(command.options.get("SOURCE")),
         )
-        return dataframe_to_timeline(dataframe, mode=command.options.get("MODE", "count"))
+        return dataframe_to_timeline(
+            dataframe,
+            mode=command.options.get("MODE", "count"),
+            context=query_context(command, window),
+        )
 
     def geo(self, command: ParsedCommand) -> list[TimelinePoint]:
-        dataframe = self._query_events(command.options.get("SINCE", "24h"))
+        window = command.options.get("SINCE", "24h")
+        dataframe = self._query_events(window)
         dataframe = filter_events(
             dataframe,
             command.query or self.default_top_query,
             _split_codes(command.options.get("COUNTRY")),
+            _split_codes(command.options.get("LANGUAGE")),
+            _split_values(command.options.get("SOURCE")),
         )
-        return dataframe_to_geo(dataframe)
+        return dataframe_to_geo(dataframe, context=query_context(command, window))
+
+    def timeline_drilldown(self, point: TimelinePoint, limit: int = DEFAULT_ARTICLE_LIMIT) -> list[Article]:
+        dataframe = self._query_events(str(point.raw.get("since", "24h")))
+        dataframe = filter_events(
+            dataframe,
+            str(point.raw.get("query", "")),
+            _split_codes(str(point.raw.get("country_filter", ""))),
+            _split_codes(str(point.raw.get("language_filter", ""))),
+            _split_values(str(point.raw.get("source_filter", ""))),
+        )
+        bucket = str(point.raw.get("bucket", point.timestamp))
+        if bucket:
+            dataframe = filter_timeline_bucket(dataframe, bucket)
+        return self._articles_from_dataframe(dataframe, query=f"TL:{bucket}", limit=limit)
+
+    def geo_drilldown(self, point: TimelinePoint, limit: int = DEFAULT_ARTICLE_LIMIT) -> list[Article]:
+        dataframe = self._query_events(str(point.raw.get("since", "24h")))
+        dataframe = filter_events(
+            dataframe,
+            str(point.raw.get("query", "")),
+            _split_codes(str(point.raw.get("country_filter", ""))),
+            _split_codes(str(point.raw.get("language_filter", ""))),
+            _split_values(str(point.raw.get("source_filter", ""))),
+        )
+        country = str(point.raw.get("country", point.timestamp))
+        dataframe = filter_geo_country(dataframe, country)
+        return self._articles_from_dataframe(dataframe, query=f"GEO:{country}", limit=limit)
+
+    def source_stats(self, command: ParsedCommand) -> list[SourceStat]:
+        dataframe = self._query_events(command.options.get("SINCE", "24h"))
+        dataframe = filter_events(
+            dataframe,
+            command.query,
+            _split_codes(command.options.get("COUNTRY")),
+            _split_codes(command.options.get("LANGUAGE")),
+            _split_values(command.options.get("SOURCE")),
+        )
+        return source_stats_from_dataframe(dataframe)
+
+    def source_stats_from_articles(self, articles: list[Article]) -> list[SourceStat]:
+        return source_stats_from_articles(articles)
 
     def watch_news(self, command: ParsedCommand) -> list[Article]:
-        if not self.watchlist:
+        if not self.active_watchlist:
             raise ValueError("Watchlist is empty. Use WATCH ADD keyword <value> or WATCH ADD country <code>.")
         window = command.options.get("SINCE", "6h")
         limit = parse_limit(command.options.get("LIMIT"), default=self.default_article_limit)
@@ -172,7 +241,7 @@ class NewsService:
         dataframe = self._query_events(window)
         dataframe = filter_watchlist(
             dataframe,
-            self.watchlist,
+            self.active_watchlist,
             fulltext_url_matches=self._watchlist_fulltext_urls(),
         )
         records = dataframe.fillna("").to_dict("records")
@@ -212,14 +281,30 @@ class NewsService:
             existing.index = i
         return item
 
+    def set_watch_item_enabled(self, index: int, enabled: bool) -> WatchItem:
+        if index < 1 or index > len(self.watchlist):
+            raise ValueError(f"Watch item {index} is not available.")
+        item = self.watchlist[index - 1]
+        if self.storage is not None:
+            if item.storage_id is not None:
+                self.storage.set_watch_item_enabled(item.storage_id, enabled)
+            self._reload_watchlist()
+            return self.watchlist[index - 1]
+        item.enabled = enabled
+        return item
+
     def watchlist_labels(self) -> list[str]:
         return [item.label() for item in self.watchlist]
+
+    @property
+    def active_watchlist(self) -> list[WatchItem]:
+        return [item for item in self.watchlist if item.enabled]
 
     def _reload_watchlist(self) -> None:
         if self.storage is None:
             return
         self.watchlist = [
-            WatchItem(index=i, kind=item.kind, value=item.value, storage_id=item.id)
+            WatchItem(index=i, kind=item.kind, value=item.value, storage_id=item.id, enabled=item.enabled)
             for i, item in enumerate(self.storage.list_watch_items(self.workspace_name), start=1)
         ]
 
@@ -290,7 +375,8 @@ class NewsService:
     def cleanup_cache(self, target: str) -> dict[str, int]:
         if self.storage is None:
             raise ValueError("CACHE requires TUI storage.")
-        return self.storage.cleanup_cache(target)
+        parts = target.split(maxsplit=1)
+        return self.storage.cleanup_cache(parts[0], parts[1] if len(parts) > 1 else "")
 
     def query_history_labels(self, limit: int = 20) -> list[str]:
         if self.storage is None:
@@ -321,12 +407,21 @@ class NewsService:
         max_records: int = DEFAULT_ARTICLE_LIMIT,
         order: str = "newest",
         ranked: bool = False,
+        languages: list[str] | None = None,
+        sources: list[str] | None = None,
     ) -> list[Article]:
         dataframe = self._query_events(since_window)
-        dataframe = filter_events(dataframe, query, countries or [])
+        dataframe = filter_events(dataframe, query, countries or [], languages or [], sources or [])
         records = dataframe.fillna("").to_dict("records")
         articles = [article_from_event_record(i + 1, row, query=query) for i, row in enumerate(records)]
         articles = self._prepare_article_results(articles, limit=max_records, order=order, ranked=ranked)
+        self._index_articles(articles)
+        return articles
+
+    def _articles_from_dataframe(self, dataframe: pd.DataFrame, query: str, limit: int) -> list[Article]:
+        records = dataframe.fillna("").to_dict("records")
+        articles = [article_from_event_record(i + 1, row, query=query) for i, row in enumerate(records)]
+        articles = self._prepare_article_results(articles, limit=limit, order="newest", ranked=False)
         self._index_articles(articles)
         return articles
 
@@ -367,6 +462,23 @@ class NewsService:
         if self.storage is None:
             raise ValueError("ALERT requires TUI storage.")
         return self.storage.delete_alert(name)
+
+    def pause_alert(self, name: str) -> bool:
+        return self.set_alert_state(name, "paused")
+
+    def resume_alert(self, name: str) -> bool:
+        return self.set_alert_state(name, "active")
+
+    def mute_alert(self, name: str, window: str) -> bool:
+        if self.storage is None:
+            raise ValueError("ALERT requires TUI storage.")
+        muted_until = (self.now_func() + parse_since_window(window)).replace(microsecond=0).isoformat()
+        return self.storage.set_alert_state(name, "muted", muted_until=muted_until, last_error="")
+
+    def set_alert_state(self, name: str, state: str) -> bool:
+        if self.storage is None:
+            raise ValueError("ALERT requires TUI storage.")
+        return self.storage.set_alert_state(name, state, last_error="" if state == "active" else None)
 
     def list_alerts(self) -> list[str]:
         if self.storage is None:
@@ -422,6 +534,47 @@ class NewsService:
             return 0
         return self.storage.unread_alert_count()
 
+    def save_to_library(self, article: Article) -> str:
+        if self.storage is None:
+            raise ValueError("LIB requires TUI storage.")
+        return self.storage.save_library_article(article, state="saved")
+
+    def list_library(self, limit: int = 50) -> list[Article]:
+        if self.storage is None:
+            raise ValueError("LIB requires TUI storage.")
+        rows = self.storage.list_library(limit=limit)
+        return [article_from_index_record(i + 1, row, query="LIB") for i, row in enumerate(rows)]
+
+    def delete_library_item(self, identifier: str) -> bool:
+        if self.storage is None:
+            raise ValueError("LIB requires TUI storage.")
+        article_id = self._library_article_id(identifier)
+        return self.storage.delete_library_item(article_id)
+
+    def mark_library_article(self, article: Article, state: str) -> str:
+        if self.storage is None:
+            raise ValueError("LIB requires TUI storage.")
+        article_id = self.storage.save_library_article(article, state=state)
+        article.raw = {**article.raw, "reading_state": state}
+        return article_id
+
+    def note_library_article(self, article: Article, note: str) -> str:
+        if self.storage is None:
+            raise ValueError("LIB requires TUI storage.")
+        article_id = self.storage.save_library_article(article, state=str(article.raw.get("reading_state") or "saved"))
+        self.storage.set_article_note(article_id, note)
+        article.raw = {**article.raw, "notes": note}
+        return article_id
+
+    def _library_article_id(self, identifier: str) -> str:
+        if identifier.isdigit():
+            rows = self.storage.list_library()
+            index = int(identifier)
+            if index < 1 or index > len(rows):
+                raise ValueError(f"Library item {identifier} is not available.")
+            return rows[index - 1]["id"]
+        return identifier
+
     def fetch_fulltext(self, article: Article) -> Article:
         if not article.url:
             article.error = "Selected event has no SOURCEURL."
@@ -434,14 +587,25 @@ class NewsService:
                 return article
             self.storage.set_enrichment_status(article, "pending")
 
-        try:
-            fulltext_article = self.fulltext_func(article.url)
-        except Exception as exc:
-            article.error = str(exc)
-            article.enrichment_status = "failed"
-            if self.storage is not None:
-                self.storage.set_enrichment_status(article, "failed", str(exc))
-            return article
+        fulltext_article = None
+        last_error = ""
+        for attempt in range(max(self.fulltext_retry_limit, 1)):
+            try:
+                fulltext_article = self.fulltext_func(article.url)
+                last_error = ""
+                break
+            except Exception as exc:
+                last_error = str(exc)
+                partial = partial_text_from(exc)
+                if partial and self.storage is not None:
+                    article.error = last_error
+                    self.storage.save_partial_text(article, partial)
+                if attempt + 1 >= max(self.fulltext_retry_limit, 1):
+                    article.error = last_error
+                    article.enrichment_status = "failed"
+                    if self.storage is not None:
+                        self.storage.set_enrichment_status(article, "failed", last_error)
+                    return article
 
         if fulltext_article is None:
             article.error = "Full-text download returned no article."
@@ -452,9 +616,12 @@ class NewsService:
 
         article.fulltext = getattr(fulltext_article, "text", "") or ""
         if not article.fulltext:
+            partial = partial_text_from(fulltext_article)
             article.error = "Full-text download completed but text was empty."
             article.enrichment_status = "failed"
             if self.storage is not None:
+                if partial:
+                    self.storage.save_partial_text(article, partial)
                 self.storage.set_enrichment_status(article, "failed", article.error)
         else:
             article.error = ""
@@ -504,7 +671,7 @@ class NewsService:
             return {}
         return {
             item.value: self.storage.fulltext_match_urls(item.value)
-            for item in self.watchlist
+            for item in self.active_watchlist
             if item.kind == "keyword"
         }
 
@@ -542,15 +709,24 @@ class NewsService:
                     "fulltext_path": row.get("fulltext_path", ""),
                     "enriched_at": row.get("enriched_at", ""),
                     "enrichment_error": row.get("enrichment_error", ""),
+                    "fulltext_retry_count": row.get("fulltext_retry_count", 0),
+                    "partial_text_path": row.get("partial_text_path", ""),
+                }
+            elif row.get("partial_text_path") or row.get("fulltext_retry_count"):
+                article.raw = {
+                    **article.raw,
+                    "enrichment_error": row.get("enrichment_error", ""),
+                    "fulltext_retry_count": row.get("fulltext_retry_count", 0),
+                    "partial_text_path": row.get("partial_text_path", ""),
                 }
 
     def _annotate_watch_hits(self, articles: list[Article]) -> None:
-        if not self.watchlist:
+        if not self.active_watchlist:
             return
         fulltext_url_matches = self._watchlist_fulltext_urls()
         for article in articles:
             hits = []
-            for item in self.watchlist:
+            for item in self.active_watchlist:
                 reason = article_watch_match(article, item, fulltext_url_matches)
                 if reason:
                     hits.append(f"{item.kind}:{item.value} ({reason})")
@@ -582,7 +758,13 @@ def _format_event_time(value: datetime) -> str:
     return value.strftime("%Y-%m-%d-%H-%M-%S")
 
 
-def filter_events(dataframe: pd.DataFrame, query: str = "", countries: list[str] | None = None) -> pd.DataFrame:
+def filter_events(
+    dataframe: pd.DataFrame,
+    query: str = "",
+    countries: list[str] | None = None,
+    languages: list[str] | None = None,
+    sources: list[str] | None = None,
+) -> pd.DataFrame:
     if dataframe.empty:
         return dataframe
 
@@ -600,6 +782,27 @@ def filter_events(dataframe: pd.DataFrame, query: str = "", countries: list[str]
                 axis=1,
             )
             filtered = filtered[country_mask]
+
+    language_codes = {language.lower() for language in languages or []}
+    if language_codes:
+        language_columns = [
+            column
+            for column in ["language", "lang", "Language", "SourceLanguage"]
+            if column in filtered.columns
+        ]
+        if language_columns:
+            language_mask = filtered[language_columns].fillna("").astype(str).apply(
+                lambda row: any(value.lower() in language_codes for value in row),
+                axis=1,
+            )
+            filtered = filtered[language_mask]
+
+    source_domains = [source.lower() for source in sources or []]
+    if source_domains and "SOURCEURL" in filtered.columns:
+        source_mask = filtered["SOURCEURL"].fillna("").astype(str).apply(
+            lambda url: any(source in article_domain(url) or source in url.lower() for source in source_domains)
+        )
+        filtered = filtered[source_mask]
 
     terms = [term for term in query.lower().split() if term]
     if terms:
@@ -700,9 +903,14 @@ def sort_events(dataframe: pd.DataFrame, order: str = "newest") -> pd.DataFrame:
     return sorted_frame.sort_values("_sort_date", ascending=ascending).drop(columns=["_sort_date"])
 
 
-def dataframe_to_timeline(dataframe: pd.DataFrame, mode: str = "count") -> list[TimelinePoint]:
+def dataframe_to_timeline(
+    dataframe: pd.DataFrame,
+    mode: str = "count",
+    context: dict[str, str] | None = None,
+) -> list[TimelinePoint]:
     if dataframe.empty:
         return []
+    base_context = context or {}
 
     if "DATEADDED" in dataframe.columns:
         series = dataframe["DATEADDED"].fillna("").astype(str).str.slice(0, 12)
@@ -718,7 +926,11 @@ def dataframe_to_timeline(dataframe: pd.DataFrame, mode: str = "count") -> list[
         frame["_tone"] = pd.to_numeric(frame.get("AvgTone", 0), errors="coerce").fillna(0)
         values = frame.groupby("_bucket")["_tone"].mean().sort_index()
         return [
-            TimelinePoint(timestamp=str(timestamp), value=round(float(value), 3), raw={"mode": "tone"})
+            TimelinePoint(
+                timestamp=str(timestamp),
+                value=round(float(value), 3),
+                raw={**base_context, "mode": "tone", "bucket": str(timestamp)},
+            )
             for timestamp, value in values.items()
         ]
     if normalized_mode in {"source_country", "country"}:
@@ -733,21 +945,51 @@ def dataframe_to_timeline(dataframe: pd.DataFrame, mode: str = "count") -> list[
                 TimelinePoint(
                     timestamp=str(timestamp),
                     value=str(top_country),
-                    raw={"mode": "source_country", "count": int(counts.iloc[0]) if not counts.empty else 0},
+                    raw={
+                        **base_context,
+                        "mode": "source_country",
+                        "bucket": str(timestamp),
+                        "count": int(counts.iloc[0]) if not counts.empty else 0,
+                    },
+                )
+            )
+        return points
+    if normalized_mode == "language":
+        frame = dataframe.copy()
+        frame["_bucket"] = series
+        language_series = first_existing_series(frame, ["language", "lang", "Language", "SourceLanguage"])
+        points = []
+        for timestamp, group in frame.assign(_language=language_series).groupby("_bucket"):
+            counts = group["_language"].replace("", "unknown").value_counts()
+            top_language = counts.index[0] if not counts.empty else "unknown"
+            points.append(
+                TimelinePoint(
+                    timestamp=str(timestamp),
+                    value=str(top_language),
+                    raw={
+                        **base_context,
+                        "mode": "language",
+                        "bucket": str(timestamp),
+                        "count": int(counts.iloc[0]) if not counts.empty else 0,
+                    },
                 )
             )
         return points
     if normalized_mode != "count":
-        raise ValueError("TL MODE must be count, tone, or source_country.")
+        raise ValueError("TL MODE must be count, tone, source_country, or language.")
 
     counts = series.value_counts().sort_index()
     return [
-        TimelinePoint(timestamp=str(timestamp), value=int(value), raw={"mode": "count", "count": int(value)})
+        TimelinePoint(
+            timestamp=str(timestamp),
+            value=int(value),
+            raw={**base_context, "mode": "count", "bucket": str(timestamp), "count": int(value)},
+        )
         for timestamp, value in counts.items()
     ]
 
 
-def dataframe_to_geo(dataframe: pd.DataFrame) -> list[TimelinePoint]:
+def dataframe_to_geo(dataframe: pd.DataFrame, context: dict[str, str] | None = None) -> list[TimelinePoint]:
     if dataframe.empty:
         return []
     country_columns = [
@@ -759,9 +1001,98 @@ def dataframe_to_geo(dataframe: pd.DataFrame) -> list[TimelinePoint]:
         return []
     country_series = dataframe[country_columns].replace("", pd.NA).bfill(axis=1).iloc[:, 0].fillna("")
     counts = country_series.replace("", "unknown").value_counts()
+    total = int(counts.sum()) or 1
     return [
-        TimelinePoint(timestamp=str(country), value=int(count), raw={"country": str(country), "count": int(count)})
+        TimelinePoint(
+            timestamp=str(country),
+            value=f"{int(count)} ({(int(count) / total) * 100:.1f}%)",
+            raw={
+                **(context or {}),
+                "mode": "geo",
+                "country": str(country),
+                "count": int(count),
+                "percentage": round((int(count) / total) * 100, 3),
+            },
+        )
         for country, count in counts.items()
+    ]
+
+
+def query_context(command: ParsedCommand, since_window: str) -> dict[str, str]:
+    return {
+        "query": command.query,
+        "since": since_window,
+        "country_filter": command.options.get("COUNTRY", ""),
+        "language_filter": command.options.get("LANGUAGE", ""),
+        "source_filter": command.options.get("SOURCE", ""),
+    }
+
+
+def filter_timeline_bucket(dataframe: pd.DataFrame, bucket: str) -> pd.DataFrame:
+    if dataframe.empty:
+        return dataframe
+    if "DATEADDED" in dataframe.columns:
+        series = dataframe["DATEADDED"].fillna("").astype(str).str.slice(0, len(bucket))
+    elif "SQLDATE" in dataframe.columns:
+        series = dataframe["SQLDATE"].fillna("").astype(str).str.slice(0, len(bucket))
+    else:
+        return dataframe
+    return dataframe[series == bucket]
+
+
+def filter_geo_country(dataframe: pd.DataFrame, country: str) -> pd.DataFrame:
+    if dataframe.empty:
+        return dataframe
+    country_columns = [
+        column
+        for column in ["ActionGeo_CountryCode", "Actor1CountryCode", "Actor2CountryCode"]
+        if column in dataframe.columns
+    ]
+    if not country_columns:
+        return dataframe.iloc[0:0]
+    normalized = country.lower()
+    values = dataframe[country_columns].fillna("").astype(str)
+    if normalized == "unknown":
+        mask = values.apply(lambda row: all(not cell for cell in row), axis=1)
+    else:
+        mask = values.apply(lambda row: any(cell.lower() == normalized for cell in row), axis=1)
+    return dataframe[mask]
+
+
+def first_existing_series(dataframe: pd.DataFrame, columns: list[str]) -> pd.Series:
+    for column in columns:
+        if column in dataframe.columns:
+            return dataframe[column].fillna("").astype(str)
+    return pd.Series([""] * len(dataframe), index=dataframe.index)
+
+
+def source_stats_from_dataframe(dataframe: pd.DataFrame) -> list[SourceStat]:
+    if dataframe.empty or "SOURCEURL" not in dataframe.columns:
+        return []
+    frame = dataframe.copy()
+    frame["_source_domain"] = frame["SOURCEURL"].fillna("").astype(str).apply(article_domain).replace("", "unknown")
+    frame["_tone"] = pd.to_numeric(frame.get("AvgTone", 0), errors="coerce").fillna(0)
+    grouped = frame.groupby("_source_domain").agg(count=("_source_domain", "size"), avg_tone=("_tone", "mean"))
+    grouped = grouped.sort_values(["count", "avg_tone"], ascending=[False, False])
+    return [
+        SourceStat(index=i, source=str(source), count=int(row["count"]), avg_tone=round(float(row["avg_tone"]), 3))
+        for i, (source, row) in enumerate(grouped.iterrows(), start=1)
+    ]
+
+
+def source_stats_from_articles(articles: list[Article]) -> list[SourceStat]:
+    buckets: dict[str, list[float]] = {}
+    for article in articles:
+        source = article_domain(article.url) or article.source or "unknown"
+        buckets.setdefault(source, []).append(safe_float(article.tone))
+    rows = sorted(
+        buckets.items(),
+        key=lambda item: (len(item[1]), sum(item[1]) / len(item[1]) if item[1] else 0),
+        reverse=True,
+    )
+    return [
+        SourceStat(index=i, source=source, count=len(tones), avg_tone=round(sum(tones) / len(tones), 3) if tones else 0.0)
+        for i, (source, tones) in enumerate(rows, start=1)
     ]
 
 
@@ -771,8 +1102,25 @@ def _split_codes(value: str | None) -> list[str]:
     return [code.strip().upper() for code in value.split(",") if code.strip()]
 
 
+def _split_values(value: str | None) -> list[str]:
+    if not value:
+        return []
+    return [part.strip() for part in value.split(",") if part.strip()]
+
+
 def sort_articles_by_published_at(articles: list[Article], order: str = "newest") -> list[Article]:
-    reverse = parse_order(order) == "newest"
+    normalized = parse_order(order)
+    if normalized == "tone":
+        return sorted(articles, key=lambda article: abs(safe_float(article.tone)), reverse=True)
+    if normalized == "sources":
+        return sorted(
+            articles,
+            key=lambda article: safe_float(article.raw.get("NumSources") or article.raw.get("NumArticles") or 0),
+            reverse=True,
+        )
+    if normalized == "relevance":
+        return rank_top_articles(articles)
+    reverse = normalized == "newest"
     return sorted(articles, key=lambda article: event_time_number(article.published_at), reverse=reverse)
 
 
@@ -863,6 +1211,14 @@ def article_watch_match(
     return "metadata" if metadata_match else ""
 
 
+def partial_text_from(value: Any) -> str:
+    for name in ["partial_text", "text", "body"]:
+        text = getattr(value, name, "")
+        if text:
+            return str(text)
+    return ""
+
+
 def article_metadata_haystack(article: Article) -> str:
     fields = [
         article.title,
@@ -900,6 +1256,7 @@ def article_domain(url: str) -> str:
 
 def alert_label(alert: dict[str, Any]) -> str:
     extras = []
+    extras.append(f"state:{alert.get('state', 'active')}")
     if alert.get("country"):
         extras.append(f"country:{alert['country']}")
     if alert.get("source"):
@@ -909,6 +1266,10 @@ def alert_label(alert: dict[str, Any]) -> str:
     extras.append(f"freq:{alert.get('scan_frequency', 300)}s")
     if alert.get("last_scanned_at"):
         extras.append(f"last:{alert['last_scanned_at']}")
+    if alert.get("muted_until"):
+        extras.append(f"muted_until:{alert['muted_until']}")
+    if alert.get("last_error"):
+        extras.append(f"error:{alert['last_error']}")
     suffix = f" [{' '.join(extras)}]" if extras else ""
     return f"{alert['id']}. {alert['name']}: {alert['query']}{suffix}"
 

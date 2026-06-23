@@ -6,11 +6,16 @@ from newsfeed.tui.commands import parse_command, parse_limit, parse_order, parse
 
 
 def test_parse_news_command_with_query_and_options():
-    command = parse_command('NEWS "oil prices" SINCE:12h COUNTRY:US,UK')
+    command = parse_command('NEWS "oil prices" SINCE:12h COUNTRY:US,UK SOURCE:example.com LANGUAGE:en')
 
     assert command.name == "NEWS"
     assert command.query == "oil prices"
-    assert command.options == {"SINCE": "12h", "COUNTRY": "US,UK"}
+    assert command.options == {
+        "SINCE": "12h",
+        "COUNTRY": "US,UK",
+        "SOURCE": "example.com",
+        "LANGUAGE": "en",
+    }
 
 
 def test_parse_export_command():
@@ -27,6 +32,16 @@ def test_parse_brief_command():
     assert command.name == "BRIEF"
     assert command.args == ["CURRENT"]
     assert command.options["PATH"] == "/tmp/brief.md"
+
+
+def test_parse_library_and_citation_commands():
+    assert parse_command("LIB SAVE").args == ["SAVE"]
+    assert parse_command("LIB MARK read").args == ["MARK", "read"]
+    assert parse_command('LIB NOTE "follow up"').args == ["NOTE", "follow up"]
+    cite = parse_command("CITE PATH:/tmp/citation.md")
+
+    assert cite.name == "CITE"
+    assert cite.options["PATH"] == "/tmp/citation.md"
 
 
 def test_parse_watch_command():
@@ -53,6 +68,13 @@ def test_parse_search_and_alert_commands():
     assert hits.args == ["HITS"]
 
 
+def test_parse_alert_state_commands():
+    assert parse_command("ALERT PAUSE oil").args == ["PAUSE", "oil"]
+    assert parse_command("ALERT RESUME oil").args == ["RESUME", "oil"]
+    assert parse_command("ALERT MUTE oil 1h").args == ["MUTE", "oil", "1h"]
+    assert parse_command("ALERT STATE oil paused").args == ["STATE", "oil", "paused"]
+
+
 def test_parse_pagination_commands():
     assert parse_command("NEXT").name == "NEXT"
     assert parse_command("PREV").name == "PREV"
@@ -63,12 +85,16 @@ def test_parse_pagination_commands():
 
 
 def test_parse_workspace_cache_config_and_geo_commands():
+    assert parse_command('SRC "oil" SINCE:6h').name == "SRC"
+    assert parse_command("SRC CURRENT").args == ["CURRENT"]
     assert parse_command('GEO "oil" SINCE:6h').name == "GEO"
     assert parse_command('SAVE QUERY oil NEWS "oil" SINCE:6h').args == ["QUERY", "oil", "NEWS", "oil"]
     assert parse_command("LOAD QUERY oil").args == ["QUERY", "oil"]
     assert parse_command("WORKSPACE USE macro").args == ["USE", "macro"]
     assert parse_command("CACHE STATS").args == ["STATS"]
+    assert parse_command("CACHE CLEAN EXPIRED 7d").args == ["CLEAN", "EXPIRED", "7d"]
     assert parse_command("CONFIG EXPORT PATH:/tmp/config.json").options["PATH"] == "/tmp/config.json"
+    assert parse_command("CANCEL").name == "CANCEL"
 
 
 def test_parse_row_number_validation():
@@ -89,8 +115,11 @@ def test_parse_limit_validation():
 def test_parse_order_validation():
     assert parse_order(None) == "newest"
     assert parse_order("oldest") == "oldest"
+    assert parse_order("tone") == "tone"
+    assert parse_order("sources") == "sources"
+    assert parse_order("relevance") == "relevance"
 
-    with pytest.raises(ValueError, match="ORDER must be newest or oldest"):
+    with pytest.raises(ValueError, match="ORDER must be newest"):
         parse_order("sideways")
 
 

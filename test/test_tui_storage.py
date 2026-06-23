@@ -1,4 +1,6 @@
 import sqlite3
+import os
+import time
 
 from newsfeed.tui.models import Article
 from newsfeed.tui.storage import TuiStorage, default_db_candidates, stable_article_id
@@ -35,6 +37,16 @@ def test_storage_persists_watchlist_items(tmp_path):
     assert items[0].id == item.id
     assert items[0].kind == "country"
     assert items[0].value == "US"
+    assert items[0].enabled is True
+
+
+def test_storage_toggles_watchlist_item_enabled(tmp_path):
+    storage = TuiStorage(tmp_path / "tui.db")
+    item = storage.add_watch_item("keyword", "oil")
+
+    assert storage.set_watch_item_enabled(item.id, False) is True
+
+    assert storage.list_watch_items()[0].enabled is False
 
 
 def test_storage_deletes_watchlist_item(tmp_path):
@@ -121,6 +133,22 @@ def test_fulltext_cache_writes_file_and_searches_without_sqlite_body(tmp_path):
     assert "oil price shock in article body" not in str(row)
 
 
+def test_cache_clean_expired_removes_only_old_files(tmp_path):
+    storage = TuiStorage(tmp_path / "tui.db")
+    old_file = storage.results_dir / "old.csv"
+    new_file = storage.fulltext_dir / "new.txt"
+    old_file.write_text("old", encoding="utf-8")
+    new_file.write_text("new", encoding="utf-8")
+    old_time = time.time() - (10 * 24 * 60 * 60)
+    os.utime(old_file, (old_time, old_time))
+
+    result = storage.cleanup_cache("expired", "7d")
+
+    assert result["removed_files"] == 1
+    assert not old_file.exists()
+    assert new_file.exists()
+
+
 def test_fulltext_cache_loads_existing_file_by_url(tmp_path):
     storage = TuiStorage(tmp_path / "tui.db")
     article = Article(index=1, title="A", url="https://example.com/a")
@@ -158,6 +186,23 @@ def test_get_article_index_by_url_returns_latest_metadata(tmp_path):
 
     assert row["source_url"] == "https://example.com/a"
     assert row["enrichment_status"] == "indexed"
+
+
+def test_library_save_mark_note_list_and_delete(tmp_path):
+    storage = TuiStorage(tmp_path / "tui.db")
+    article = Article(index=1, title="A", url="https://example.com/a")
+
+    article_id = storage.save_library_article(article)
+    storage.set_reading_state(article_id, "read")
+    storage.set_article_note(article_id, "important")
+    rows = storage.list_library()
+
+    assert rows[0]["id"] == article_id
+    assert rows[0]["reading_state"] == "read"
+    assert rows[0]["notes"] == "important"
+
+    assert storage.delete_library_item(article_id) is True
+    assert storage.list_library() == []
 
 
 def test_enrichment_status_pending_and_failed(tmp_path):
@@ -274,6 +319,54 @@ def test_alert_unread_count_and_mark_read(tmp_path):
     assert storage.unread_alert_count() == 0
 
 
+def test_paused_and_muted_alerts_do_not_scan(tmp_path):
+    storage = TuiStorage(tmp_path / "tui.db")
+    article = Article(index=1, title="A", url="https://example.com/a")
+    storage.save_fulltext(article, "oil price shock")
+    storage.add_alert("oil", "oil")
+
+    assert storage.set_alert_state("oil", "paused") is True
+    assert storage.check_alerts() == []
+
+    storage.set_alert_state("oil", "muted", muted_until="2099-01-01T00:00:00+00:00")
+    assert storage.check_alerts() == []
+
+    storage.set_alert_state("oil", "active")
+    assert storage.check_alerts()[0]["source_url"] == "https://example.com/a"
+
+
+def test_unread_alert_count_only_counts_active_alerts(tmp_path):
+    storage = TuiStorage(tmp_path / "tui.db")
+    active = Article(index=1, title="A", url="https://example.com/a")
+    paused = Article(index=2, title="B", url="https://example.com/b")
+    storage.save_fulltext(active, "active oil")
+    storage.save_fulltext(paused, "paused gas")
+    active_id = stable_article_id(active)
+    paused_id = stable_article_id(paused)
+    storage.add_alert("oil", "oil")
+    storage.add_alert("gas", "gas")
+    storage.record_alert_hit(1, active_id, {"title": "A"})
+    storage.record_alert_hit(2, paused_id, {"title": "B"})
+    storage.set_alert_state("gas", "paused")
+
+    assert storage.unread_alert_count() == 1
+
+
+def test_alert_scan_failure_sets_failed_state(tmp_path):
+    storage = TuiStorage(tmp_path / "tui.db")
+    storage.add_alert("oil", "oil")
+
+    def fail_match(alert):
+        raise RuntimeError("scan failed")
+
+    storage.match_alert_articles = fail_match
+
+    assert storage.check_alerts() == []
+    alert = storage.list_alerts()[0]
+    assert alert["state"] == "failed"
+    assert alert["last_error"] == "scan failed"
+
+
 def test_storage_migrates_existing_alert_schema(tmp_path):
     db_path = tmp_path / "old_alerts.db"
     conn = sqlite3.connect(db_path)
@@ -306,6 +399,9 @@ def test_storage_migrates_existing_alert_schema(tmp_path):
     assert "country" in alert
     assert "last_scanned_at" in alert
     assert alert["scan_frequency"] == 300
+    assert alert["state"] == "active"
+    assert alert["muted_until"] == ""
+    assert alert["last_error"] == ""
 
 
 def test_workspace_layout_and_config_round_trip(tmp_path):

@@ -2,7 +2,15 @@ import json
 
 import pandas as pd
 
-from newsfeed.tui.export import articles_to_dataframe, cached_excerpt, export_articles, export_brief, export_timeline
+from newsfeed.tui.export import (
+    articles_to_dataframe,
+    cached_excerpt,
+    citation_markdown,
+    export_articles,
+    export_brief,
+    export_citation,
+    export_timeline,
+)
 from newsfeed.tui.models import Article, TimelinePoint
 
 
@@ -80,6 +88,12 @@ def test_export_brief_writes_markdown_with_cached_excerpt(tmp_path):
     content = path.read_text(encoding="utf-8")
 
     assert "# Test Brief" in content
+    assert "## Key Headlines" in content
+    assert "## Watchlist Hits" in content
+    assert "## Notable Trends" in content
+    assert "System Inferences:" in content
+    assert "## Source Links" in content
+    assert "Source Facts:" in content
     assert "- Time: 2026-06-23 12:00" in content
     assert "- SourceURL: https://example.com/oil" in content
     assert "- Match: alert:oil (fulltext)" in content
@@ -94,3 +108,23 @@ def test_cached_excerpt_truncates_text():
     excerpt = cached_excerpt(article, max_chars=20)
 
     assert excerpt == ("x" * 20) + "..."
+
+
+def test_export_citation_writes_markdown_snippet(tmp_path):
+    fulltext_path = tmp_path / "fulltext.txt"
+    fulltext_path.write_text("cached citation body", encoding="utf-8")
+    article = Article(
+        index=1,
+        title="Citation",
+        url="https://example.com/citation",
+        display_time="2026-06-23 12:00",
+        raw={"fulltext_path": str(fulltext_path)},
+    )
+    path = tmp_path / "citation.md"
+
+    export_citation(article, str(path))
+    content = path.read_text(encoding="utf-8")
+
+    assert citation_markdown(article).startswith("## Citation")
+    assert "- SourceURL: https://example.com/citation" in content
+    assert "cached citation body" in content

@@ -8,6 +8,8 @@ from newsfeed.tui.models import article_from_event_record, cameo_label, format_e
 from newsfeed.tui.services import (
     NewsService,
     WatchItem,
+    dataframe_to_geo,
+    dataframe_to_timeline,
     parse_scan_frequency,
     parse_tone_threshold,
     event_since_to_range,
@@ -49,6 +51,7 @@ def event_dataframe():
                 "ActionGeo_FullName": "Houston, Texas",
                 "EventCode": "042",
                 "NumMentions": 5,
+                "NumSources": 1,
                 "NumArticles": 2,
                 "AvgTone": "-1.2",
                 "DATEADDED": "20260623114500",
@@ -64,6 +67,7 @@ def event_dataframe():
                 "ActionGeo_FullName": "Paris, France",
                 "EventCode": "010",
                 "NumMentions": 50,
+                "NumSources": 5,
                 "NumArticles": 9,
                 "AvgTone": "0.5",
                 "DATEADDED": "20260623113000",
@@ -127,6 +131,32 @@ def test_top_order_option_keeps_explicit_time_sort():
     assert articles[1].actors == "CENTRAL BANK / MARKET"
 
 
+def test_news_order_supports_tone_sources_and_relevance():
+    FakeEventQuery.calls = []
+    dataframe = event_dataframe()
+    dataframe.loc[0, "AvgTone"] = "-9.0"
+    FakeEventQuery.dataframe = dataframe
+
+    service = NewsService(event_factory=FakeEventQuery, now_func=fixed_now)
+    tone = service.news(parse_command('NEWS "example.com" ORDER:tone LIMIT:2'))
+    sources = service.news(parse_command('NEWS "example.com" ORDER:sources LIMIT:2'))
+    relevance = service.news(parse_command('NEWS "example.com" ORDER:relevance LIMIT:2'))
+
+    assert tone[0].url == "https://example.com/oil"
+    assert sources[0].url == "https://example.com/bank"
+    assert len(relevance) == 2
+
+
+def test_news_source_filter_matches_source_url_domain():
+    FakeEventQuery.calls = []
+    FakeEventQuery.dataframe = event_dataframe()
+
+    service = NewsService(event_factory=FakeEventQuery, now_func=fixed_now)
+    articles = service.news(parse_command('NEWS "central" SOURCE:example.com/bank LIMIT:5'))
+
+    assert [article.url for article in articles] == ["https://example.com/bank"]
+
+
 def test_timeline_aggregates_event_counts():
     FakeEventQuery.calls = []
     FakeEventQuery.dataframe = event_dataframe()
@@ -158,13 +188,68 @@ def test_geo_aggregates_event_countries():
     service = NewsService(event_factory=FakeEventQuery, now_func=fixed_now)
     points = service.geo(parse_command("GEO SINCE:24h"))
 
-    assert {point.timestamp: point.value for point in points} == {"US": 1, "FR": 1}
+    assert {point.timestamp: point.raw["count"] for point in points} == {"US": 1, "FR": 1}
+    assert all("(" in str(point.value) for point in points)
+
+
+def test_source_stats_from_query_and_articles():
+    FakeEventQuery.calls = []
+    FakeEventQuery.dataframe = event_dataframe()
+
+    service = NewsService(event_factory=FakeEventQuery, now_func=fixed_now)
+    stats = service.source_stats(parse_command("SRC SINCE:24h"))
+    current_stats = service.source_stats_from_articles(
+        [
+            article_from_event_record(1, event_dataframe().iloc[0].to_dict()),
+            article_from_event_record(2, event_dataframe().iloc[1].to_dict()),
+        ]
+    )
+
+    assert stats[0].source == "example.com"
+    assert stats[0].count == 2
+    assert current_stats[0].source == "example.com"
+    assert current_stats[0].count == 2
 
 
 def test_filter_events_matches_country_and_all_query_terms():
     dataframe = filter_events(event_dataframe(), query="oil houston", countries=["US"])
 
     assert dataframe["GLOBALEVENTID"].tolist() == [1]
+
+
+def test_filter_events_matches_source_and_noops_missing_language():
+    dataframe = filter_events(event_dataframe(), sources=["example.com/bank"], languages=["en"])
+
+    assert dataframe["GLOBALEVENTID"].tolist() == [2]
+
+
+def test_timeline_language_and_geo_percentages_include_drilldown_context():
+    dataframe = event_dataframe().copy()
+    dataframe["language"] = ["en", "fr"]
+    context = {"query": "oil", "since": "6h"}
+
+    timeline = dataframe_to_timeline(dataframe, mode="language", context=context)
+    geo = dataframe_to_geo(dataframe, context=context)
+
+    assert timeline[0].raw["mode"] == "language"
+    assert timeline[0].raw["bucket"] == "202606231130"
+    assert timeline[0].raw["query"] == "oil"
+    assert geo[0].raw["percentage"] == 50.0
+    assert "(" in str(geo[0].value)
+
+
+def test_timeline_and_geo_drilldown_return_matching_articles():
+    FakeEventQuery.calls = []
+    FakeEventQuery.dataframe = event_dataframe()
+    service = NewsService(event_factory=FakeEventQuery, now_func=fixed_now)
+
+    timeline_point = service.timeline(parse_command('TL "oil" SINCE:6h'))[0]
+    timeline_articles = service.timeline_drilldown(timeline_point)
+    geo_point = next(point for point in service.geo(parse_command("GEO SINCE:6h")) if point.raw["country"] == "US")
+    geo_articles = service.geo_drilldown(geo_point)
+
+    assert [article.url for article in timeline_articles] == ["https://example.com/oil"]
+    assert [article.url for article in geo_articles] == ["https://example.com/oil"]
 
 
 def test_cameo_label_maps_event_code():
@@ -206,6 +291,17 @@ def test_watch_news_uses_saved_watch_items():
 
     assert len(articles) == 1
     assert articles[0].title.startswith("Make a visit")
+
+
+def test_disabled_watch_item_does_not_match():
+    watchlist = [
+        WatchItem(index=1, kind="country", value="FR", enabled=False),
+        WatchItem(index=2, kind="keyword", value="oil", enabled=True),
+    ]
+
+    dataframe = filter_watchlist(event_dataframe(), [item for item in watchlist if item.enabled])
+
+    assert dataframe["GLOBALEVENTID"].tolist() == [1]
 
 
 def test_watch_news_keyword_uses_cached_fulltext_matches(tmp_path):
@@ -257,7 +353,20 @@ def test_watchlist_uses_sqlite_storage_when_available(tmp_path):
 
     restarted = NewsService(storage=TuiStorage(db_path))
 
-    assert restarted.watchlist_labels() == ["1. country:US"]
+    assert restarted.watchlist_labels() == ["1. [on] country:US"]
+
+
+def test_service_can_disable_and_enable_watch_item(tmp_path):
+    service = NewsService(storage=TuiStorage(tmp_path / "tui.db"))
+    service.add_watch_item("keyword", "oil")
+
+    disabled = service.set_watch_item_enabled(1, False)
+    assert disabled.enabled is False
+    assert service.watchlist_labels() == ["1. [off] keyword:oil"]
+
+    enabled = service.set_watch_item_enabled(1, True)
+    assert enabled.enabled is True
+    assert service.watchlist_labels() == ["1. [on] keyword:oil"]
 
 
 def test_workspace_switch_isolates_watchlist_items(tmp_path):
@@ -269,9 +378,9 @@ def test_workspace_switch_isolates_watchlist_items(tmp_path):
     service.add_watch_item("keyword", "oil")
     service.set_workspace("default")
 
-    assert service.watchlist_labels() == ["1. country:US"]
+    assert service.watchlist_labels() == ["1. [on] country:US"]
     service.set_workspace("macro")
-    assert service.watchlist_labels() == ["1. keyword:oil"]
+    assert service.watchlist_labels() == ["1. [on] keyword:oil"]
 
 
 def test_service_fulltext_cache_and_search(tmp_path):
@@ -307,6 +416,29 @@ def test_service_fetch_fulltext_reuses_cached_file_without_downloading(tmp_path)
     assert updated.fulltext == "cached fulltext body"
     assert updated.enrichment_status == "indexed"
     assert updated.error == ""
+
+
+def test_service_fetch_fulltext_retries_and_records_partial_text(tmp_path):
+    class PartialError(Exception):
+        partial_text = "partial article body"
+
+    calls = {"count": 0}
+
+    def fail_download(url):
+        calls["count"] += 1
+        raise PartialError("temporary failure")
+
+    storage = TuiStorage(tmp_path / "tui.db")
+    article = article_from_event_record(1, event_dataframe().iloc[0].to_dict())
+    service = NewsService(fulltext_func=fail_download, storage=storage, fulltext_retry_limit=2)
+
+    updated = service.fetch_fulltext(article)
+    row = storage.get_article_index_by_url(article.url)
+
+    assert calls["count"] == 2
+    assert updated.enrichment_status == "failed"
+    assert row["fulltext_retry_count"] >= 1
+    assert row["partial_text_path"].endswith(".partial.txt")
 
 
 def test_event_refresh_hydrates_existing_fulltext_status(tmp_path):
@@ -351,8 +483,24 @@ def test_service_alert_add_and_check_cached_fulltext(tmp_path):
     hits = service.check_alerts()
 
     assert alert_id == 1
-    assert alerts == ["1. oil: oil shock [freq:300s]"]
+    assert alerts == ["1. oil: oil shock [state:active freq:300s]"]
     assert hits[0].url == article.url
+
+
+def test_service_alert_pause_resume_mute_and_state(tmp_path):
+    storage = TuiStorage(tmp_path / "tui.db")
+    service = NewsService(storage=storage, now_func=fixed_now)
+    service.add_alert("oil", "oil")
+
+    assert service.pause_alert("oil") is True
+    assert "state:paused" in service.list_alerts()[0]
+    assert service.resume_alert("oil") is True
+    assert "state:active" in service.list_alerts()[0]
+    assert service.mute_alert("oil", "1h") is True
+    assert "state:muted" in service.list_alerts()[0]
+    assert "muted_until:" in service.list_alerts()[0]
+    assert service.set_alert_state("oil", "failed") is True
+    assert "state:failed" in service.list_alerts()[0]
 
 
 def test_service_alert_extended_options_and_hits_mark_read(tmp_path):
