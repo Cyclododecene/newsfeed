@@ -139,3 +139,49 @@ python -m newsfeed --db EVENT --version V2 --start 2021-01-01 --end 2021-01-02 -
 2. **Async Download**: 3-5x faster download speed
 3. **Incremental Query**: 80-90% reduction in time for repeated queries
 4. **Parquet Format**: 70-90% reduction in storage space, 2-3x faster read/write
+
+## 🖥️ NewsFeed Terminal / TUI Roadmap
+
+### v0.1 Local News Query TUI
+- [x] Add Textual dependency and `scripts/newsfeed_terminal.sh` launcher
+- [x] Create `newsfeed/tui/` package with `app.py`, `models.py`, `commands.py`, `services.py`, `widgets.py`, and `export.py`
+- [x] Implement a command input bar with Bloomberg-like commands: `TOP`, `NEWS`, `READ`, `TL`, `FULLTEXT`, `EXPORT`, `HELP`, and `QUIT`
+- [x] Implement `NEWS "<query>" SINCE:<window> COUNTRY:<codes>` using EventV2 and local filtering
+- [x] Implement `TOP` as a default recent-news query with a configurable 6-hour window
+- [x] Implement a dense news table showing headline, source, time, URL, country, and tone where available
+- [x] Implement an article detail pane with title, source, URL, query context, and raw metadata
+- [x] Implement `READ <row>` and keyboard selection to open article details
+- [x] Implement non-blocking `FULLTEXT` download for the selected article using `newsfeed.utils.fulltext.download`
+- [x] Implement `TL` timeline volume view using EventV2 local aggregation
+- [x] Implement `EXPORT FORMAT:csv|json|parquet PATH:<path>` for current results
+- [x] Add loading, empty, and error states so failed network calls do not crash the TUI
+- [x] Add parser and service-layer tests that avoid real network calls
+
+### v0.2 Watchlist Workspace
+- [x] Add SQLite storage for workspaces, saved queries, articles, watchlists, and query history
+- [x] Implement watchlist CRUD for keyword, company, country, theme, and source items
+- [x] Cache downloaded full text as files under `~/.cache/newsfeed/fulltext/` and index only paths in SQLite
+- [x] Add asynchronous enrichment status model with `none`, `pending`, `indexed`, and `failed`
+- [x] Add bounded background full-text enrichment queue for `TOP`, `NEWS`, and `WATCH NEWS`
+- [x] Implement `SEARCH "<query>"` over cached full-text files without SQLite FTS or body storage
+- [x] Extend keyword watch matching to include cached full-text hits
+- [x] Implement basic `ALERT ADD/LIST/DELETE/CHECK` against cached full-text articles
+- [x] Highlight watchlist hits in the news table
+- [x] Implement `WATCH NEWS` to query current watchlist items
+- [x] Persist saved queries and workspace configuration across restarts
+- [x] Add Top News ranking v1 using recency, watchlist matches, source diversity, relevance, tone extremity, and duplicate penalty
+
+### v0.3 Alerts, Briefings, and Cache Views
+- [x] Implement alert rule CRUD with query, country, source, tone threshold, and scan frequency fields
+- [x] Run alert scans in background workers and persist hits in SQLite
+- [x] Display unread alert count in the TUI status bar
+- [x] Implement `BRIEF` Markdown export for current query, alert hits, and watchlist results
+- [x] Add GEO view and timeline tone/source-country modes
+- [x] Add `CACHE` view for cache size, file count, query history, and cleanup actions
+
+### v1.0 Product Hardening
+- [x] Support multiple workspaces and layout profiles
+- [x] Add complete command help and keyboard shortcut reference
+- [x] Add import/export for configuration, watchlists, saved queries, and alerts
+- [x] Store large historical query results as Parquet
+- [x] Keep the TUI data layer separate enough to support future Web/API/agent frontends

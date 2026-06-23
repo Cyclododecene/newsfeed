@@ -27,7 +27,8 @@ setup(
         "aiohttp>=3.11.0",
         "aiofiles>=24.1.0",
         "pyarrow>=19.0.0",
-        "joblib>=1.4.0"
+        "joblib>=1.4.0",
+        "textual>=0.86.0"
     ],
     entry_points={
         'console_scripts': [
