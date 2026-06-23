@@ -34,7 +34,7 @@ setup(
             'newsfeed=newsfeed.__main__:main',
         ],
     },
-    license="MIT",
+    license="GPL-3.0",
     classifiers=[
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",

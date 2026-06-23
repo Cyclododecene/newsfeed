@@ -41,6 +41,13 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
 TV_NO_QUERY_MODES = {"stationdetails", "trendingtopics"}
+DOC_TIMELINE_MODES = {
+    "timelinevol",
+    "timelinevolraw",
+    "timelinetone",
+    "timelinelang",
+    "timelinesourcecountry",
+}
 
 
 def text_regex(str_1, str_2, newstring, text):
@@ -94,42 +101,68 @@ def _strip_doc_api_params(query_string: str) -> str:
 def doc_query_search(query_string=None,
                      max_recursion_depth: int = 100,
                      mode=None,
-                     proxy: dict = None):
+                     proxy: dict = None,
+                     timeout: int = 30):
 
     if query_string == None:
         return ValueError("Query string must be provided")
     elif mode == None:
         return ValueError("Query mode must be provided")
     else:
-        query_string = query_string
-        response = requests.get(
-            f"https://api.gdeltproject.org/api/v2/doc/doc?query={query_string}&mode={mode}&format=json",
-            proxies=proxy)
+        try:
+            response = requests.get(
+                "https://api.gdeltproject.org/api/v2/doc/doc",
+                params={
+                    "query": query_string,
+                    "mode": mode,
+                    "format": "json",
+                },
+                proxies=proxy,
+                timeout=timeout)
+        except Exception as e:
+            return e
 
         if response.text == "Timespan is too short.\n":
             return ValueError("Timespan is too short.")
+        if not response.ok:
+            return ValueError("GDELT DOC API request failed with status {}".format(
+                response.status_code))
 
-        else:
-            if mode == "artlist":
-                pattern = re.compile(r'\d{14}')
-                output = pd.DataFrame(
-                    load_json(
-                        response.text,
-                        max_recursion_depth=max_recursion_depth)["articles"])
-                # Safely extract timestamp from query_string
-                timestamps = pattern.findall(query_string)
-                if len(timestamps) >= 2:
-                    timeadded = timestamps[1]
-                elif len(timestamps) == 1:
-                    timeadded = timestamps[0]
-                else:
-                    # Fallback: use current time or empty string
-                    timeadded = ""
-                output["timeadded"] = [timeadded] * len(output)
-                return output
-            elif mode == "timelinevol" or "timelinevolraw" or "timelinetone" or "timelinetone" or "timelinelang" or "timelinesourcecountry":
-                return pd.DataFrame(
-                    load_json(response.text)["timeline"][0]["data"])
+        try:
+            payload = load_json(response.text,
+                                max_recursion_depth=max_recursion_depth)
+        except Exception as e:
+            return e
+        if not isinstance(payload, dict):
+            return ValueError("GDELT DOC API response was not a JSON object")
+
+        if mode == "artlist":
+            pattern = re.compile(r'\d{14}')
+            articles = payload.get("articles")
+            if not isinstance(articles, list):
+                return ValueError("GDELT DOC API artlist response did not include an articles list")
+            output = pd.DataFrame(articles)
+            # Safely extract timestamp from query_string
+            timestamps = pattern.findall(query_string)
+            if len(timestamps) >= 2:
+                timeadded = timestamps[1]
+            elif len(timestamps) == 1:
+                timeadded = timestamps[0]
+            else:
+                # Fallback: use current time or empty string
+                timeadded = ""
+            output["timeadded"] = [timeadded] * len(output)
+            return output
+        elif mode in DOC_TIMELINE_MODES:
+            timeline = payload.get("timeline")
+            if not isinstance(timeline, list) or not timeline:
+                return ValueError("GDELT DOC API timeline response did not include timeline data")
+            data = timeline[0].get("data") if isinstance(timeline[0], dict) else None
+            if not isinstance(data, list):
+                return ValueError("GDELT DOC API timeline response did not include a data list")
+            return pd.DataFrame(data)
+
+        return ValueError("Unsupported query mode: {}".format(mode))
 
 
 def geo_query_search(query_string:str = None,
@@ -144,15 +177,18 @@ def geo_query_search(query_string:str = None,
     if timespan <= 0:
         return ValueError("Timespan must be a positive integer")
     else:
-        response = requests.get(
-            "https://api.gdeltproject.org/api/v2/geo/geo",
-            params={
-                "query": query_string,
-                "format": format,
-                "timespan": "{}d".format(timespan)
-            },
-            proxies=proxy,
-            timeout=timeout)
+        try:
+            response = requests.get(
+                "https://api.gdeltproject.org/api/v2/geo/geo",
+                params={
+                    "query": query_string,
+                    "format": format,
+                    "timespan": "{}d".format(timespan)
+                },
+                proxies=proxy,
+                timeout=timeout)
+        except Exception as e:
+            return e
 
         if response.text == "Timespan is too short.\n":
             return ValueError("Timespan is too short.")
@@ -210,6 +246,13 @@ def article_search(query_filter=None,
             tqdm.tqdm(pool.imap_unordered(worker, query_string),
                       total=len(query_string)))
 
+        errors = [item for item in articles_list if isinstance(item, Exception)]
+        articles_list = [item for item in articles_list if isinstance(item, pd.DataFrame)]
+        if not articles_list:
+            if errors:
+                return errors[0]
+            return ValueError("No article data returned from GDELT DOC API")
+
         return pd.concat(articles_list).drop_duplicates().reset_index(
             drop=True)
     except Exception as e:
@@ -218,7 +261,8 @@ def article_search(query_filter=None,
 
 def timeline_search(query_filter=None,
                     max_recursion_depth: int = 100,
-                    query_mode: str = "timelinevol"):
+                    query_mode: str = "timelinevol",
+                    proxy: dict = None):
 
     if query_filter == None:
         return ValueError("Filter must be provided")
@@ -226,7 +270,12 @@ def timeline_search(query_filter=None,
     tmp_query_string = query_filter.query_string
     timeline = doc_query_search(query_string=tmp_query_string,
                                 max_recursion_depth=max_recursion_depth,
-                                mode=query_mode)
+                                mode=query_mode,
+                                proxy=proxy)
+    if isinstance(timeline, Exception):
+        return timeline
+    if "date" not in timeline.columns:
+        return ValueError("GDELT DOC API timeline response did not include a date column")
     timeline["date"] = pd.to_datetime(timeline["date"],
                                       format="%Y%m%dT%H%M%SZ")
     return timeline

@@ -100,3 +100,34 @@ def test_geo_search_strips_doc_api_parameters_and_adds_source_language(monkeypat
     assert captured["timespan"] == 3
     assert captured["timeout"] == 9
     assert captured["parse_json"] is True
+
+
+def test_doc_query_search_returns_value_error_for_malformed_timeline(monkeypatch):
+    def fake_get(url, params=None, proxies=None, timeout=None):
+        assert params["mode"] == "timelinevolraw"
+        return FakeResponse('{"timeline": 0}')
+
+    monkeypatch.setattr(api_query.requests, "get", fake_get)
+
+    result = api_query.doc_query_search(query_string="test", mode="timelinevolraw")
+
+    assert isinstance(result, ValueError)
+    assert "timeline data" in str(result)
+
+
+def test_timeline_search_returns_value_error_instead_of_raising(monkeypatch):
+    query_filter = Art_Filter(
+        keyword=["Exchange Rate", "World"],
+        start_date="20211231000000",
+        end_date="20211231010000",
+    )
+
+    monkeypatch.setattr(
+        api_query,
+        "doc_query_search",
+        lambda **kwargs: ValueError("bad timeline"),
+    )
+
+    result = api_query.timeline_search(query_filter=query_filter, query_mode="timelinevolraw")
+
+    assert isinstance(result, ValueError)
